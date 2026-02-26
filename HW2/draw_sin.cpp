@@ -9,7 +9,7 @@ void setTDRStyle() {
   // delete old style if present
   if (tdrStyle)
     delete tdrStyle;
-  tdrStyle = new TStyle("tdrStyle", "CMS TDR style");
+  tdrStyle = new TStyle("tdrStyle", "TDR style");
 
   // use plain white canvas
   tdrStyle->SetCanvasBorderMode(0);
