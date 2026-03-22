@@ -1,2 +1,4 @@
 *.pdf
 *.png
+project/python/utils/__pycache__/
+project/data/**
