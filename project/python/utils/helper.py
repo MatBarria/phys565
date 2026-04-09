@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import uproot as ur
 import os
-from .constants import SOURCES_LABEL, COLORS
+from .constants import SOURCES_LABEL, COLORS, ALL_BRANCHES_ORIGINAL
 
 
 def get_canvas(draw_ratio=False):
@@ -137,20 +137,14 @@ def get_output_directory(variable, base_directory, variables_dic):
     return base_directory
 
 
-def clean_null_values(branches, variables, variables_dic):
-    if (
-        variables[0] not in variables_dic["diJet"]
-        and variables[0] not in variables_dic["jet"]
-    ):
-        return
+def clean_null_values(branches, variables):
 
-    if variables[0] == "n_jet":
-        return
-
-    null_value = 0
-    if variables[0] in ["delta_phi_diJet", "pt_balance"]:
-        null_value = -1
-
+    null_value = -1
+    if  "pt" in variables[0]  or "Pt" in variables[0]:
+        null_value = 1
+    if variables[0] in ALL_BRANCHES_ORIGINAL:
+        null_value = 0
+        
     bool_list = branches[variables[0]] != null_value
     for var in variables:
         branches[var] = branches[var][bool_list]

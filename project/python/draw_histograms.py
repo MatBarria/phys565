@@ -2,7 +2,6 @@ import uproot as ur
 import mplhep as hep
 import numpy as np
 import matplotlib.pyplot as plt
-import awkward as ak
 
 from utils.helper import (
     get_canvas,
@@ -21,6 +20,7 @@ from utils.constants import (
     SIGNAL_SOURCES,
 )
 
+final_bkg_sources =[]
 
 def get_histograms_from_tuple(
     sources,
@@ -36,41 +36,52 @@ def get_histograms_from_tuple(
 
     # variable_bin = variables[0]
 
-    tuple_path = "../data/tuples/"
+    tuple_path = "../data/proccess_tuples/"
 
     for source in sources:
-        file_name = source + ".root:events"
+        file_name = source + "_tuples.root:tree_output"
 
         with ur.open(tuple_path + file_name) as file:
             branches = file.arrays(variables, library="np")
 
         # If branch is "array per event" (numpy object array), take the first element per event
-        if isinstance(branches[variables[0]][0], (list, np.ndarray)):
-            # print("before: ", signal_branches[variable])
+        # if isinstance(branches[variables[0]][0], (list, np.ndarray)):
+        # # print("before: ", signal_branches[variable])
 
-            branches_bool= [
-                True if len(arr)> 0  else False for arr in branches[variables[0]]
-            ]
-            branches[variables[0]] = [
-                arr[0] for arr in branches[variables[0]] if len(arr) > 0
-            ]
-            branches["triggerIsoMu24"] = branches["triggerIsoMu24"][branches_bool]
-            branches["EventWeight"] = branches["EventWeight"][branches_bool]
-            branches[variables[0]] = np.array(branches[variables[0]])
+        # branches_bool= [
+        # True if len(arr)> 0  else False for arr in branches[variables[0]]
+        # ]
+        # branches[variables[0]] = [
+        # arr[0] for arr in branches[variables[0]] if len(arr) > 0
+        # ]
+        # branches["triggerIsoMu24"] = branches["triggerIsoMu24"][branches_bool]
+        # branches["EventWeight"] = branches["EventWeight"][branches_bool]
+        # branches[variables[0]] = np.array(branches[variables[0]])
 
         if variables[0] != "triggerIsoMu24":
-            branches[variables[0]] =branches[variables[0]][branches["triggerIsoMu24"]==1] 
-            if variables[0] != "EventWeight":
-                branches["EventWeight"] =branches["EventWeight"][branches["triggerIsoMu24"]==1] 
+            branches[variables[0]] = branches[variables[0]][
+                branches["triggerIsoMu24"] == 1
+            ]
+            # if variables[0] != "EventWeight":
+            # branches["EventWeight"] =branches["EventWeight"][branches["triggerIsoMu24"]==1]
+            if variables[0] != "weight":
+                branches["weight"] = branches["weight"][branches["triggerIsoMu24"] == 1]
+        else:
+            # print("are we not here?")
+            if branches[variables[0]].dtype == bool:
+                branches[variables[0]] = branches[variables[0]].astype(np.int32)
 
         histogram, bins = np.histogram(
             branches[variables[0]],
             bins=N_BINS[variables[0]],
             range=X_RANGE[variables[0]],
-            weights=(branches["EventWeight"]),
+            weights=(branches["weight"]),
         )
         histograms_list.append(histogram)
         bins_list.append(bins)
+        # print("variable: ", variables[0])
+        # print("source : ", source)
+        # print("histo : ", histogram)
     return histograms_list, bins_list
 
 
@@ -85,7 +96,7 @@ def draw_data_and_simul_and_ratio(
     print("****** PLOTTING " + variable + " *****")
     print("*" * len("****** PLOTTING " + variable + " *****"))
 
-    variables = [variable, "EventWeight", "triggerIsoMu24"]
+    variables = [variable, "weight", "triggerIsoMu24"]
 
     data_histogram, data_bins = get_histograms_from_tuple(
         ["data"],
@@ -112,7 +123,7 @@ def draw_data_and_simul_and_ratio(
         label=get_background_label_list(background_sources),
         ax=axs[0],
         stack=True,
-        color=get_color_list(len(background_sources)),
+        color=get_color_list(len(bkg_histograms_list)),
     )
 
     hep.histplot(
@@ -151,7 +162,8 @@ def draw_data_and_simul_and_ratio(
     axs[0].set_ylabel(r"Events")
     axs[0].set_ylim(0.1, 1000 * np.max(data_histogram))
     axs[0].set_xlim(data_bins[0][0], data_bins[0][-1])
-    axs[0].set_yscale("log")
+    # axs[0].set_yscale("log")
+    axs[0].set_ylim(0., triggerIsoMu241.4 * np.max(data_histogram))
     axs[0].legend(frameon=False, loc="upper right", ncols=2)
     axs[0].tick_params(axis="x", which="both", bottom=True, top=True, labelbottom=False)
 
@@ -181,7 +193,7 @@ def draw_data_and_simul_and_ratio(
     axs[1].set_xlim(data_bins[0][0], data_bins[0][-1])
     axs[1].set_xlabel(variable)
 
-    output_directory = "../plots/ratio/"
+    output_directory = "../plots/ratio-proccessed/"
     output_name = variable + "_MCData_ratio"
 
     # output_directory = get_output_directory(variable, output_directory, variables_type)

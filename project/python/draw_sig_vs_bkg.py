@@ -24,73 +24,34 @@ plt.style.use(hep.style.CMS)
 
 def draw_sig_and_bg(variable):
 
-    tuple_path = "../data/tuples/"
+    tuple_path = "../data/proccess_tuples/"
 
     print("PLOTTING: ", variable)
-    background_tree = ur.open(tuple_path + "background.root:events")
-    background_branches = background_tree.arrays([variable, "EventWeight"], library="np")  # type: ignore
+    background_tree = ur.open(tuple_path + "background.root:tree_output")
+    background_branches = background_tree.arrays([variable, "weight", "triggerIsoMu24", "Nlep_valid"], library="np")  # type: ignore
 
-    signal_tree = ur.open(tuple_path + "signal.root:events")
-    signal_branches = signal_tree.arrays([variable, "EventWeight", "triggerIsoMu24"], library="np")  # type: ignore
-    if isinstance(signal_branches[variable][0], (list, np.ndarray)):
-        print("array of arrays")
-        # print("before: ", signal_branches[variable])
+    signal_tree = ur.open(tuple_path + "signal.root:tree_output")
+    signal_branches = signal_tree.arrays([variable, "weight", "triggerIsoMu24", "Nlep_valid"], library="np")  # type: ignore
 
-        signal_branches_bool = [
-            True if len(arr)> 0  else False for arr in signal_branches[variable]
-        ]
-        signal_branches[variable] = [
-            arr[0] for arr in signal_branches[variable] if len(arr) > 0
-        ]
-        background_branches_bool = [
-            True if len(arr)> 0  else False for arr in background_branches[variable]
-        ]
-        background_branches[variable] = [
-            arr[0] for arr in background_branches[variable] if len(arr) > 0
-        ]
-        signal_branches[variable] = np.array(signal_branches[variable])
-        background_branches[variable] = np.array(background_branches[variable])
-        signal_branches["triggerIsoMu24"] = signal_branches["triggerIsoMu24"][signal_branches_bool]
-        signal_branches["EventWeight"] = signal_branches["EventWeight"][signal_branches_bool]
-        background_branches["EventWeight"] = background_branches["EventWeight"][background_branches_bool]
-        # print("after: ", signal_branches[variable])
-       
-    else:
-        print("array of floats")
+    bool_list_bkg = np.ones_like(background_branches[variable], dtype=bool)
+    bool_list_bkg = (bool_list_bkg) & (background_branches["triggerIsoMu24"] == 1)
+    bool_list_bkg = (bool_list_bkg) & (background_branches["Nlep_valid"] > 0)
 
-    if variable != "triggerIsoMu24":
-        signal_branches["EventWeight"] = signal_branches["EventWeight"][
-            signal_branches["triggerIsoMu24"] == 1
-        ]
-        signal_branches[variable] = signal_branches[variable][
-            signal_branches["triggerIsoMu24"] == 1
-        ]
-
-    if variable[0] != "N":
-        signal_branches["EventWeight"] = signal_branches["EventWeight"][
-            signal_branches[variable] != 0
-        ]
-        signal_branches[variable] = signal_branches[variable][
-            signal_branches[variable] != 0
-        ]
-        background_branches["EventWeight"] = background_branches["EventWeight"][
-            background_branches[variable] != 0
-        ]
-        background_branches[variable] = background_branches[variable][
-            background_branches[variable] != 0
-        ]
+    bool_list_sig = np.ones_like(signal_branches[variable], dtype=bool)
+    bool_list_sig = (bool_list_sig) & (signal_branches["triggerIsoMu24"] == 1)
+    bool_list_sig = (bool_list_sig) & (signal_branches["Nlep_valid"] > 0)
 
     bkg_histogram, bins = np.histogram(
-        background_branches[variable],
+        background_branches[variable][bool_list_bkg],
         bins=N_BINS[variable],
         range=X_RANGE[variable],
-        weights=background_branches["EventWeight"],
+        weights=background_branches["weight"][bool_list_bkg],
     )
     signal_histogram, _ = np.histogram(
-        signal_branches[variable],
+        signal_branches[variable][bool_list_sig],
         bins=N_BINS[variable],
         range=X_RANGE[variable],
-        weights=signal_branches["EventWeight"],
+        weights=signal_branches["weight"][bool_list_sig],
     )
     fig, ax = get_canvas()
 
