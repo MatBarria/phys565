@@ -1,0 +1,21 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/g++",
+      "-g",
+      "-Wall",
+      "-std=c++17",
+      "-pthread",
+      "-std=c++17",
+      "-m64",
+      "-I/home/truga/software/root/include",
+      "-c",
+      "-o",
+      "CreateTuples.o",
+      "src/CreateTuples.cc"
+    ],
+    "directory": "/home/truga/projects/phys565/project",
+    "file": "/home/truga/projects/phys565/project/src/CreateTuples.cc",
+    "output": "/home/truga/projects/phys565/project/CreateTuples.o"
+  }
+]

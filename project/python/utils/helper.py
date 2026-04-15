@@ -1,8 +1,10 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import uproot as ur
-import os
-from .constants import SOURCES_LABEL, COLORS, ALL_BRANCHES_ORIGINAL
+
+from .constants import ALL_BRANCHES_ORIGINAL, COLORS, SOURCES_LABEL
 
 
 def get_canvas(draw_ratio=False):
@@ -50,11 +52,12 @@ def save_figure(fig, outputDirectory, name):
     None
     """
 
-    os.makedirs(outputDirectory, exist_ok=True)
-    fig.savefig(outputDirectory + name + ".pdf", bbox_inches="tight")
-    fig.savefig(outputDirectory + name + ".png", bbox_inches="tight", dpi=300)
-    fig.savefig(outputDirectory + name + ".pdf")
-    fig.savefig(outputDirectory + name + ".png", dpi=300)
+    os.makedirs(outputDirectory+ "pdf/", exist_ok=True)
+    os.makedirs(outputDirectory+ "png/", exist_ok=True)
+    fig.savefig(outputDirectory + "pdf/" + name + ".pdf", bbox_inches="tight")
+    fig.savefig(outputDirectory + "png/" + name + ".png", bbox_inches="tight", dpi=300)
+    # fig.savefig(outputDirectory + name + ".pdf")
+    # fig.savefig(outputDirectory + "png/"name + ".png", dpi=300)
     print(outputDirectory + name + " Has been created")
 
 
@@ -140,11 +143,11 @@ def get_output_directory(variable, base_directory, variables_dic):
 def clean_null_values(branches, variables):
 
     null_value = -1
-    if  "pt" in variables[0]  or "Pt" in variables[0]:
+    if "pt" in variables[0] or "Pt" in variables[0]:
         null_value = 1
     if variables[0] in ALL_BRANCHES_ORIGINAL:
         null_value = 0
-        
+
     bool_list = branches[variables[0]] != null_value
     for var in variables:
         branches[var] = branches[var][bool_list]

@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 from utils.helper import (
     get_canvas,
     save_figure,
-    get_background_label_list,
-    get_color_list,
+    clean_null_values,
 )
 from utils.constants import (
     ALL_BRANCHES,
@@ -26,37 +25,55 @@ def draw_sig_and_bg(variable):
 
     tuple_path = "../data/proccess_tuples/"
 
+    variables = [variable, "weight", "triggerIsoMu24", "Nlep_valid", "NMuon_valid"]
+    variables = list(set(variables))
     print("PLOTTING: ", variable)
     background_tree = ur.open(tuple_path + "background.root:tree_output")
-    background_branches = background_tree.arrays([variable, "weight", "triggerIsoMu24", "Nlep_valid"], library="np")  # type: ignore
+    background_branches = background_tree.arrays(variables, library="np")  # type: ignore
 
     signal_tree = ur.open(tuple_path + "signal.root:tree_output")
-    signal_branches = signal_tree.arrays([variable, "weight", "triggerIsoMu24", "Nlep_valid"], library="np")  # type: ignore
+    signal_branches = signal_tree.arrays(variables, library="np")  # type: ignore
 
     bool_list_bkg = np.ones_like(background_branches[variable], dtype=bool)
     bool_list_bkg = (bool_list_bkg) & (background_branches["triggerIsoMu24"] == 1)
-    bool_list_bkg = (bool_list_bkg) & (background_branches["Nlep_valid"] > 0)
+    if variable != "NMuon_valid":
+        bool_list_bkg = (bool_list_bkg) & (background_branches["NMuon_valid"] > 0)
 
     bool_list_sig = np.ones_like(signal_branches[variable], dtype=bool)
     bool_list_sig = (bool_list_sig) & (signal_branches["triggerIsoMu24"] == 1)
-    bool_list_sig = (bool_list_sig) & (signal_branches["Nlep_valid"] > 0)
+    if variable != "NMuon_valid":
+        bool_list_sig = (bool_list_sig) & (signal_branches["NMuon_valid"] > 0)
 
+    for var in variables:
+        if var in ["top_hadronic_mass_1", "top_hadronic_mass_2"]:
+            continue
+        background_branches[var] = background_branches[var][bool_list_bkg]
+        signal_branches[var] = signal_branches[var][bool_list_sig]
+
+    clean_null_values(background_branches, variables)
+    clean_null_values(signal_branches, variables)
     bkg_histogram, bins = np.histogram(
-        background_branches[variable][bool_list_bkg],
+        background_branches[variable],
         bins=N_BINS[variable],
         range=X_RANGE[variable],
-        weights=background_branches["weight"][bool_list_bkg],
+        weights=background_branches["weight"],
     )
     signal_histogram, _ = np.histogram(
-        signal_branches[variable][bool_list_sig],
+        signal_branches[variable],
         bins=N_BINS[variable],
         range=X_RANGE[variable],
-        weights=signal_branches["weight"][bool_list_sig],
+        weights=signal_branches["weight"],
     )
-    fig, ax = get_canvas()
 
-    bkg_histogram_norm = bkg_histogram / np.sum(bkg_histogram)
-    signal_histogram_norm = signal_histogram / np.sum(signal_histogram)
+    if np.sum(bkg_histogram) != 0:
+        bkg_histogram_norm = bkg_histogram / np.sum(bkg_histogram)
+    else:
+        bkg_histogram_norm = bkg_histogram 
+    if np.sum(signal_histogram) != 0:
+        signal_histogram_norm = signal_histogram / np.sum(signal_histogram)
+    else: 
+        signal_histogram_norm = signal_histogram 
+    fig, ax = get_canvas()
 
     hep.histplot(
         signal_histogram_norm,
@@ -65,7 +82,7 @@ def draw_sig_and_bg(variable):
         histtype="fill",
         label="Signal Evnts: " + str(np.sum(signal_histogram)),
         ax=ax,
-        color="blue",
+        color="red",
         alpha=0.4,
     )
 
@@ -74,7 +91,7 @@ def draw_sig_and_bg(variable):
         bins,
         yerr=False,
         ax=ax,
-        color="blue",
+        color="red",
         linewidth=2,
     )
 
@@ -85,7 +102,7 @@ def draw_sig_and_bg(variable):
         histtype="fill",
         label="Background Evnts: " + str(np.sum(bkg_histogram)),
         ax=ax,
-        color="red",
+        color="blue",
         alpha=0.4,
     )
 
@@ -94,7 +111,7 @@ def draw_sig_and_bg(variable):
         bins,
         yerr=False,
         ax=ax,
-        color="red",
+        color="blue",
         linewidth=2,
     )
     hep.cms.label(

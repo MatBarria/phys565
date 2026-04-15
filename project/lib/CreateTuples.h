@@ -135,10 +135,10 @@ private:
   int NMuon_valid, Ne_valid, Nlep_valid;
   int NMuon_valid_mc, Ne_valid_mc, Nlep_valid_mc;
 
-  float jet_Px[8] = {0}, jet_Py[6] = {0}, jet_Pz[6] = {0}, jet_E[6] = {0},
-        jet_Pt[6] = {0};
-  float bjet_Px[4] = {0}, bjet_Py[4] = {0}, bjet_Pz[4] = {0}, bjet_E[4] = {0},
-        bjet_Pt[4] = {0}, bjet_Btag[4] = {0};
+  float jet_Px[6] = {-1}, jet_Py[6] = {-1}, jet_Pz[6] = {-1}, jet_E[6] = {0},
+        jet_Pt[6] = {-1};
+  float bjet_Px[4] = {-1}, bjet_Py[4] = {-1}, bjet_Pz[4] = {-1}, bjet_E[4] = {-1},
+        bjet_Pt[4] = {-1}, bjet_Btag[4] = {-1};
   int N_valid_jets, N_valid_b_jets, N_valid_jets_tot;
 
   float MET_pt;
@@ -408,7 +408,7 @@ void CreateTuple::setBranchesAddressesInput() {
 void CreateTuple::fillOutputTree(TString channel) {
 
   std::cout << "Filling Output Tree" << std::endl;
-  double total_entries = tree_input->GetEntries();
+  Long64_t total_entries = tree_input->GetEntries();
   std::cout << "Entries: " << total_entries << std::endl;
 
   const float BOTTOM_MASS = 4.183;
@@ -486,6 +486,8 @@ void CreateTuple::fillOutputTree(TString channel) {
     mu1_Px = mu1_Py = mu1_Pz = mu1_E = mu1_Iso = mu1_Pt = -1;
     mu2_Px = mu2_Py = mu2_Pz = mu2_E = mu2_Iso = mu2_Pt = -1;
     mu3_Px = mu3_Py = mu3_Pz = mu3_E = mu3_Iso = mu3_Pt = -1;
+    e1_Px = e1_Py = e1_Pz = e1_E = e1_Iso = e1_Pt = -1;
+    e2_Px = e2_Py = e2_Pz = e2_E = e2_Iso = e2_Pt = -1;
     NMuon_valid = Ne_valid = Nlep_valid = 0;
 
     auto fill_muon = [&](int i, float &px, float &py, float &pz, float &e,
@@ -497,7 +499,8 @@ void CreateTuple::fillOutputTree(TString channel) {
         e = Muon_E[i];
         iso = Muon_Iso[i];
         pt = std::hypot(px, py);
-        if (pt > 27 && iso < 0.1 && triggerIsoMu24 == 1) {
+        //if (pt > 25 && iso < 0.1 && triggerIsoMu24 == 1) {
+        if (pt > 25) {
           n_valid = n_valid + 1;
         }
       }
@@ -512,7 +515,8 @@ void CreateTuple::fillOutputTree(TString channel) {
         e = Electron_E[i];
         iso = Electron_Iso[i];
         pt = std::hypot(px, py);
-        if (pt > 27 && iso < 0.1) {
+        //if (pt > 25 && iso < 0.1) {
+        if (pt > 25) {
           n_valid = n_valid + 1;
         }
       }
@@ -595,7 +599,7 @@ void CreateTuple::fillOutputTree(TString channel) {
     }
 
     N_valid_jets_tot = N_valid_jets + N_valid_b_jets;
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 6; ++i) {
       jet_Px[i] = -1;
       jet_Py[i] = -1;
       jet_Pz[i] = -1;
