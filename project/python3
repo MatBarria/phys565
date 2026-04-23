@@ -1,0 +1,202 @@
+import math
+import numpy as np
+
+def compute_cross_section(
+    n_obs,
+    n_bkg,
+    lumi_pb,
+    e_trigger,
+    e_acceptance,
+    dn_obs_stat=None,
+    dn_bkg_stat=None,
+    de_trigger=None,
+    de_acceptance=None,
+    dlumi=None,
+    dn_bkg_syst=None,
+):
+    """
+    Compute ttbar cross section and uncertainties.
+
+    Parameters
+    ----------
+    n_obs : float
+        Number of observed events in data after final selection.
+
+    n_bkg : float
+        Expected number of background events after final selection.
+
+    lumi_pb : float
+        Integrated luminosity in pb^-1.
+
+    e_trigger : float
+        Trigger efficiency.
+
+    e_acceptance : float
+        Acceptance (including branching fraction / analysis selection, as defined by you).
+
+    dn_obs_stat : float or None
+        Statistical uncertainty on n_obs.
+        If None, uses sqrt(n_obs).
+
+    dn_bkg_stat : float or None
+        Statistical uncertainty on n_bkg.
+        If None, uses 0.
+
+    de_trigger : float or None
+        Uncertainty on trigger efficiency.
+
+    de_acceptance : float or None
+        Uncertainty on acceptance.
+
+    dlumi : float or None
+        Uncertainty on luminosity.
+
+    dn_bkg_syst : float or None
+        Systematic uncertainty on background yield.
+
+    Returns
+    -------
+    results : dict
+        Dictionary with cross section and uncertainty components.
+    """
+
+    if e_trigger <= 0 or e_acceptance <= 0 or lumi_pb <= 0:
+        raise ValueError("lumi_pb, e_trigger, and e_acceptance must be > 0")
+
+    # -----------------------------
+    # Default statistical errors
+    # -----------------------------
+    if dn_obs_stat is None:
+        dn_obs_stat = math.sqrt(max(n_obs, 0.0))
+
+    if dn_bkg_stat is None:
+        dn_bkg_stat = 0.0
+
+    if de_trigger is None:
+        de_trigger = 0.0
+
+    if de_acceptance is None:
+        de_acceptance = 0.0
+
+    if dlumi is None:
+        dlumi = 0.0
+
+    if dn_bkg_syst is None:
+        dn_bkg_syst = 0.0
+
+    # -----------------------------
+    # Signal yield
+    # -----------------------------
+    n_sig = n_obs - n_bkg
+
+    if n_sig <= 0:
+        raise ValueError(
+            f"Signal yield is non-positive: n_sig = {n_sig:.6f}. "
+            "Check n_obs and n_bkg."
+        )
+
+    # -----------------------------
+    # Cross section
+    # -----------------------------
+    sigma_pb = n_sig / (lumi_pb * e_trigger * e_acceptance)
+
+    # -----------------------------
+    # Statistical uncertainty
+    # -----------------------------
+    dn_sig_stat = math.sqrt(dn_obs_stat**2 + dn_bkg_stat**2)
+    dsigma_stat = dn_sig_stat / (lumi_pb * e_trigger * e_acceptance)
+
+    # -----------------------------
+    # Systematic uncertainties
+    # -----------------------------
+    # Background systematic propagated directly
+    dsigma_bkg_syst = dn_bkg_syst / (lumi_pb * e_trigger * e_acceptance)
+
+    # Relative systematics from efficiencies and luminosity
+    rel_trigger = de_trigger / e_trigger if e_trigger > 0 else 0.0
+    rel_acceptance = de_acceptance / e_acceptance if e_acceptance > 0 else 0.0
+    rel_lumi = dlumi / lumi_pb if lumi_pb > 0 else 0.0
+
+    dsigma_trigger = sigma_pb * rel_trigger
+    dsigma_acceptance = sigma_pb * rel_acceptance
+    dsigma_lumi = sigma_pb * rel_lumi
+
+    dsigma_syst = math.sqrt(
+        dsigma_bkg_syst**2
+        + dsigma_trigger**2
+        + dsigma_acceptance**2
+        + dsigma_lumi**2
+    )
+
+    dsigma_total = math.sqrt(dsigma_stat**2 + dsigma_syst**2)
+
+    return {
+        "n_obs": n_obs,
+        "n_bkg": n_bkg,
+        "n_sig": n_sig,
+        "sigma_pb": sigma_pb,
+        "dn_obs_stat": dn_obs_stat,
+        "dn_bkg_stat": dn_bkg_stat,
+        "dn_sig_stat": dn_sig_stat,
+        "dsigma_stat": dsigma_stat,
+        "dn_bkg_syst": dn_bkg_syst,
+        "de_trigger": de_trigger,
+        "de_acceptance": de_acceptance,
+        "dlumi": dlumi,
+        "dsigma_bkg_syst": dsigma_bkg_syst,
+        "dsigma_trigger": dsigma_trigger,
+        "dsigma_acceptance": dsigma_acceptance,
+        "dsigma_lumi": dsigma_lumi,
+        "dsigma_syst": dsigma_syst,
+        "dsigma_total": dsigma_total,
+    }
+
+
+# ============================================================
+# Example of use
+# ============================================================
+if __name__ == "__main__":
+    # Example numbers: replace with yours
+    n_obs = 120
+    n_bkg = 35.0
+    lumi_pb = 50.0
+    e_trigger = 0.92
+    e_acceptance = 0.08
+
+    # Example uncertainties
+    dn_bkg_stat = 4.5
+    de_trigger = 0.02
+    de_acceptance = 0.01
+    dlumi = 2.0
+    dn_bkg_syst = 3.5
+
+    results = compute_cross_section(
+        n_obs=n_obs,
+        n_bkg=n_bkg,
+        lumi_pb=lumi_pb,
+        e_trigger=e_trigger,
+        e_acceptance=e_acceptance,
+        dn_obs_stat=None,          # uses sqrt(n_obs)
+        dn_bkg_stat=dn_bkg_stat,
+        de_trigger=de_trigger,
+        de_acceptance=de_acceptance,
+        dlumi=dlumi,
+        dn_bkg_syst=dn_bkg_syst,
+    )
+
+    print("==========================================")
+    print("Cross section result")
+    print("==========================================")
+    print(f"N_obs            = {results['n_obs']:.6f}")
+    print(f"N_bkg            = {results['n_bkg']:.6f}")
+    print(f"N_sig            = {results['n_sig']:.6f}")
+    print(f"sigma            = {results['sigma_pb']:.6f} pb")
+    print(f"stat unc         = {results['dsigma_stat']:.6f} pb")
+    print(f"syst unc         = {results['dsigma_syst']:.6f} pb")
+    print(f"total unc        = {results['dsigma_total']:.6f} pb")
+    print("------------------------------------------")
+    print(f"bkg syst contrib = {results['dsigma_bkg_syst']:.6f} pb")
+    print(f"trigger contrib  = {results['dsigma_trigger']:.6f} pb")
+    print(f"acceptance contr = {results['dsigma_acceptance']:.6f} pb")
+    print(f"lumi contrib     = {results['dsigma_lumi']:.6f} pb")
+    print("==========================================")

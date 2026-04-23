@@ -83,7 +83,7 @@ def get_histograms_from_tuple(
         if variables[0] != "triggerIsoMu24":
             bool_list = (bool_list) & (branches["triggerIsoMu24"] == 1)
         if variables[0] != "Nlep_valid":
-            bool_list = (bool_list) & (branches["Nlep_valid"] > 0)
+            bool_list = (bool_list) & (branches["Nlep_valid"] > 1)
         if use_dimuon_mass_cut:
             bool_list = (bool_list) & (branches["diMuon_mass"] < 20)
 
@@ -203,7 +203,7 @@ def draw_data_and_simul_and_ratio(
 
     axs.set_ylabel(r"Events")
     axs.set_ylim(0.1, 1000 * np.max(data_histogram))
-    if "mc" in variable or "MC" in variable:
+    if "mc" in variable:
         axs.set_ylim(0.1, 1000 * np.max(signal_histograms_list[0]))
     axs.set_xlim(data_bins[0][0], data_bins[0][-1])
     axs.set_yscale("log")

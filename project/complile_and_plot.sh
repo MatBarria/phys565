@@ -1,6 +1,9 @@
 make clean
 make -j4
 python3 script/run_tuples.py 
-cd python 
-python3 draw_histograms_noratio.py 
+cd ./data/proccess_tuples
+bash hadd.sh
 cd ..
+#cd python 
+#python3 draw_histograms.py 
+#cd ..

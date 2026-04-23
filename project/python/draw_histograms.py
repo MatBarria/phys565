@@ -1,31 +1,36 @@
-import uproot as ur
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
-import matplotlib.pyplot as plt
-
-from utils.helper import (
-    get_canvas,
-    save_figure,
-    get_histograms_ratio,
-    # clean_null_values,
-    get_background_label_list,
-    get_color_list,
-)
+import uproot as ur
 from utils.constants import (
-    SOURCES_LABEL,
-    N_BINS,
     ALL_BRANCHES,
-    X_RANGE,
     BACKGROUND_SOURCES,
+    N_BINS,
     SIGNAL_SOURCES,
+    SOURCES_LABEL,
+    USEFUL_BRANCHES,
+    X_RANGE,
+)
+from utils.helper import (
+    clean_null_values,
+    get_background_label_list,
+    get_canvas,
+    get_color_list,
+    get_histograms_ratio,
+    save_figure,
 )
 
-final_bkg_sources =[]
+final_bkg_sources = []
+
 
 def get_histograms_from_tuple(
     sources,
     variables,
     # is_background,
+    use_dimuon_mass_cut=False,
 ):
 
     # if not use_puweight:
@@ -44,32 +49,23 @@ def get_histograms_from_tuple(
         with ur.open(tuple_path + file_name) as file:
             branches = file.arrays(variables, library="np")
 
-        # If branch is "array per event" (numpy object array), take the first element per event
-        # if isinstance(branches[variables[0]][0], (list, np.ndarray)):
-        # # print("before: ", signal_branches[variable])
-
-        # branches_bool= [
-        # True if len(arr)> 0  else False for arr in branches[variables[0]]
-        # ]
-        # branches[variables[0]] = [
-        # arr[0] for arr in branches[variables[0]] if len(arr) > 0
-        # ]
-        # branches["triggerIsoMu24"] = branches["triggerIsoMu24"][branches_bool]
-        # branches["EventWeight"] = branches["EventWeight"][branches_bool]
-        # branches[variables[0]] = np.array(branches[variables[0]])
+        bool_list = np.ones_like(branches[variables[0]], dtype=bool)
 
         if variables[0] != "triggerIsoMu24":
-            branches[variables[0]] = branches[variables[0]][
-                branches["triggerIsoMu24"] == 1
-            ]
-            # if variables[0] != "EventWeight":
-            # branches["EventWeight"] =branches["EventWeight"][branches["triggerIsoMu24"]==1]
-            if variables[0] != "weight":
-                branches["weight"] = branches["weight"][branches["triggerIsoMu24"] == 1]
-        else:
-            # print("are we not here?")
-            if branches[variables[0]].dtype == bool:
-                branches[variables[0]] = branches[variables[0]].astype(np.int32)
+            bool_list = (bool_list) & (branches["triggerIsoMu24"] == 1)
+        # if variables[0] != "NMuon_valid":
+        bool_list = (bool_list) & (branches["NMuon_valid"] == 1)
+        # bool_list = (bool_list) & (branches["N_valid_jets"] >= 2)
+        # bool_list = (bool_list) & (branches["N_valid_b_jets"] >= 2)
+        if use_dimuon_mass_cut:
+            bool_list = (bool_list) & (branches["diMuon_mass"] < 20)
+
+        for var in variables:
+            # if var in ["top_hadronic_mass_1", "top_hadronic_mass_2"]:
+                # continue
+            branches[var] = branches[var][bool_list]
+        if variables[0] != "diMuon_mass":
+            clean_null_values(branches, variables)
 
         histogram, bins = np.histogram(
             branches[variables[0]],
@@ -77,6 +73,10 @@ def get_histograms_from_tuple(
             range=X_RANGE[variables[0]],
             weights=(branches["weight"]),
         )
+        # if np.sum(histogram) ==0:
+        # sources.remove(source)
+        # continue;
+        histogram[histogram == 0] = 0.00000001
         histograms_list.append(histogram)
         bins_list.append(bins)
         # print("variable: ", variables[0])
@@ -89,6 +89,7 @@ def draw_data_and_simul_and_ratio(
     variable,
     background_sources,
     signal_sources,
+    use_dimuon_mass_cut=False,
 ):
     plt.style.use(hep.style.CMS)
 
@@ -96,21 +97,43 @@ def draw_data_and_simul_and_ratio(
     print("****** PLOTTING " + variable + " *****")
     print("*" * len("****** PLOTTING " + variable + " *****"))
 
-    variables = [variable, "weight", "triggerIsoMu24"]
+    variables = [
+        variable,
+        "weight",
+        "triggerIsoMu24",
+        "diMuon_mass",
+        "NMuon_valid",
+        "Nlep_valid",
+        "N_valid_jets",
+        "N_valid_b_jets",
+    ]
+    variables=list(set(variables))
+    variables.insert(0, variables.pop(variables.index(variable)))
 
+    # print(variables)
+    # if variable == "top_hadronic_mass":
+        # variables.append("top_hadronic_mass_1")
+        # variables.append("top_hadronic_mass_2")
+
+
+    print(variables)
+    
     data_histogram, data_bins = get_histograms_from_tuple(
         ["data"],
         variables,
+        use_dimuon_mass_cut,
     )
 
     bkg_histograms_list, bkg_bins_list = get_histograms_from_tuple(
         background_sources,
         variables,
+        use_dimuon_mass_cut,
     )
 
     signal_histograms_list, signal_bins_list = get_histograms_from_tuple(
         signal_sources,
         variables,
+        use_dimuon_mass_cut,
     )
 
     fig, axs = get_canvas(True)
@@ -160,10 +183,13 @@ def draw_data_and_simul_and_ratio(
     )
 
     axs[0].set_ylabel(r"Events")
-    axs[0].set_ylim(0.1, 1000 * np.max(data_histogram))
+    axs[0].set_ylim(
+        0.1,
+        1000 * np.max(np.concatenate([data_histogram[0], signal_histograms_list[0]])),
+    )
     axs[0].set_xlim(data_bins[0][0], data_bins[0][-1])
     # axs[0].set_yscale("log")
-    axs[0].set_ylim(0., triggerIsoMu241.4 * np.max(data_histogram))
+    axs[0].set_ylim(0.,1.4 * np.max(data_histogram))
     axs[0].legend(frameon=False, loc="upper right", ncols=2)
     axs[0].tick_params(axis="x", which="both", bottom=True, top=True, labelbottom=False)
 
@@ -203,7 +229,7 @@ def draw_data_and_simul_and_ratio(
     plt.close()
 
 
-for variable in ALL_BRANCHES:
+for variable in USEFUL_BRANCHES:
     draw_data_and_simul_and_ratio(
         variable,
         BACKGROUND_SOURCES,
