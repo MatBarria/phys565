@@ -5,23 +5,12 @@ import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
 import uproot as ur
-from utils.constants import (
-    ALL_BRANCHES,
-    BACKGROUND_SOURCES,
-    N_BINS,
-    SIGNAL_SOURCES,
-    SOURCES_LABEL,
-    USEFUL_BRANCHES,
-    X_RANGE,
-)
-from utils.helper import (
-    clean_null_values,
-    get_background_label_list,
-    get_canvas,
-    get_color_list,
-    get_histograms_ratio,
-    save_figure,
-)
+from utils.constants import (ALL_BRANCHES, BACKGROUND_SOURCES, N_BINS,
+                             SIGNAL_SOURCES, SOURCES_LABEL, USEFUL_BRANCHES,
+                             X_RANGE)
+from utils.helper import (clean_null_values, get_background_label_list,
+                          get_canvas, get_color_list, get_histograms_ratio,
+                          save_figure)
 
 final_bkg_sources = []
 
@@ -31,6 +20,7 @@ def get_histograms_from_tuple(
     variables,
     # is_background,
     use_dimuon_mass_cut=False,
+    use_permutation_weight=False,
 ):
 
     # if not use_puweight:
@@ -49,20 +39,21 @@ def get_histograms_from_tuple(
         with ur.open(tuple_path + file_name) as file:
             branches = file.arrays(variables, library="np")
 
+        if use_permutation_weight:
+            branches["weight"] = branches["weight"] * branches["permutation_weight"]
+
         bool_list = np.ones_like(branches[variables[0]], dtype=bool)
 
         if variables[0] != "triggerIsoMu24":
             bool_list = (bool_list) & (branches["triggerIsoMu24"] == 1)
-        # if variables[0] != "NMuon_valid":
-        bool_list = (bool_list) & (branches["NMuon_valid"] == 1)
-        # bool_list = (bool_list) & (branches["N_valid_jets"] >= 2)
-        # bool_list = (bool_list) & (branches["N_valid_b_jets"] >= 2)
-        if use_dimuon_mass_cut:
-            bool_list = (bool_list) & (branches["diMuon_mass"] < 20)
+        if variables[0] != "NMuon_valid":
+            bool_list = (bool_list) & (branches["NMuon_valid"] > 0)
+        bool_list = (bool_list) & (branches["N_valid_jets_tot"] >= 4)
+        bool_list = (bool_list) & (branches["N_valid_b_jets"] >= 1)
 
         for var in variables:
             # if var in ["top_hadronic_mass_1", "top_hadronic_mass_2"]:
-                # continue
+            # continue
             branches[var] = branches[var][bool_list]
         if variables[0] != "diMuon_mass":
             clean_null_values(branches, variables)
@@ -90,6 +81,7 @@ def draw_data_and_simul_and_ratio(
     background_sources,
     signal_sources,
     use_dimuon_mass_cut=False,
+    use_permutation_weight=False,
 ):
     plt.style.use(hep.style.CMS)
 
@@ -104,36 +96,39 @@ def draw_data_and_simul_and_ratio(
         "diMuon_mass",
         "NMuon_valid",
         "Nlep_valid",
-        "N_valid_jets",
+        "N_valid_jets_tot",
         "N_valid_b_jets",
+        "permutation_weight",
     ]
-    variables=list(set(variables))
+    variables = list(set(variables))
     variables.insert(0, variables.pop(variables.index(variable)))
 
     # print(variables)
     # if variable == "top_hadronic_mass":
-        # variables.append("top_hadronic_mass_1")
-        # variables.append("top_hadronic_mass_2")
-
+    # variables.append("top_hadronic_mass_1")
+    # variables.append("top_hadronic_mass_2")
 
     print(variables)
-    
+
     data_histogram, data_bins = get_histograms_from_tuple(
         ["data"],
         variables,
         use_dimuon_mass_cut,
+        use_permutation_weight,
     )
 
     bkg_histograms_list, bkg_bins_list = get_histograms_from_tuple(
         background_sources,
         variables,
         use_dimuon_mass_cut,
+        use_permutation_weight,
     )
 
     signal_histograms_list, signal_bins_list = get_histograms_from_tuple(
         signal_sources,
         variables,
         use_dimuon_mass_cut,
+        use_permutation_weight,
     )
 
     fig, axs = get_canvas(True)
@@ -189,7 +184,7 @@ def draw_data_and_simul_and_ratio(
     )
     axs[0].set_xlim(data_bins[0][0], data_bins[0][-1])
     # axs[0].set_yscale("log")
-    axs[0].set_ylim(0.,1.4 * np.max(data_histogram))
+    axs[0].set_ylim(0.0, 1.4 * np.max(data_histogram))
     axs[0].legend(frameon=False, loc="upper right", ncols=2)
     axs[0].tick_params(axis="x", which="both", bottom=True, top=True, labelbottom=False)
 
@@ -229,9 +224,21 @@ def draw_data_and_simul_and_ratio(
     plt.close()
 
 
-for variable in USEFUL_BRANCHES:
-    draw_data_and_simul_and_ratio(
-        variable,
-        BACKGROUND_SOURCES,
-        SIGNAL_SOURCES,
-    )
+# for variable in USEFUL_BRANCHES:
+    # draw_data_and_simul_and_ratio(
+    # variable,
+    # BACKGROUND_SOURCES,
+    # SIGNAL_SOURCES,
+    # )
+draw_data_and_simul_and_ratio(
+    "top_hadronic_mass",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    use_permutation_weight=True,
+)
+draw_data_and_simul_and_ratio(
+    "top_leptoninc_mass",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    use_permutation_weight=True,
+)

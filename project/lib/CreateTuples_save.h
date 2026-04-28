@@ -10,15 +10,9 @@
 #include <algorithm>
 #include <cmath>
 // #include <cstddef>
-#include <Math/Factory.h>
-#include <Math/Functor.h>
-#include <Math/Minimizer.h>
 #include <iostream>
 #include <math.h>
 #include <ostream>
-
-constexpr int N_MEAS = 17;
-constexpr int N_PAR = 18;
 
 class CreateTuple {
   public:
@@ -36,216 +30,24 @@ class CreateTuple {
 
     void fillOutputTree(TString channel);
 
-    enum FitParIndex {
-        MU_PX = 0,
-        MU_PY = 1,
-        MU_PZ = 2,
-
-        J1_E = 3,
-        J1_ETA = 4,
-        J1_PHI = 5,
-
-        J2_E = 6,
-        J2_ETA = 7,
-        J2_PHI = 8,
-
-        J3_E = 9,
-        J3_ETA = 10,
-        J3_PHI = 11,
-
-        J4_E = 12,
-        J4_ETA = 13,
-        J4_PHI = 14,
-
-        MET_X = 15,
-        MET_Y = 16,
-
-        NU_PZ = 17
+    struct FitVar {
+        double measured;
+        double fitted;
+        double sigma;
     };
 
-    struct FitResult {
-        bool valid = false;
-        double minValue = 1e99;
-        std::array<double, N_PAR> pfit{};
-    };
-
-    FitResult minimizeEvent(const std::array<double, N_PAR> &p_start,
-                            const std::array<double, N_MEAS> &x_meas,
-                            const std::array<double, N_MEAS> &sigma) {
-        FitResult result;
-
-        ROOT::Math::Minimizer *min =
-            ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad");
-
-        if (!min) {
-            std::cerr << "ERROR: could not create Minuit2 minimizer\n";
-            return result;
-        }
-
-        min->SetMaxFunctionCalls(100000);
-        min->SetMaxIterations(10000);
-        min->SetTolerance(1e-3);
-        min->SetPrintLevel(0);
-
-        ROOT::Math::Functor f(
-            [&](const double *par) {
-                return totalFitFunction(par, x_meas, sigma);
-            },
-            N_PAR);
-
-        min->SetFunction(f);
-
-        // Set starting values and step sizes
-        min->SetVariable(MU_PX, "mu_px", p_start[MU_PX],
-                         0.01 * std::abs(p_start[MU_PX]) + 1e-3);
-        min->SetVariable(MU_PY, "mu_py", p_start[MU_PY],
-                         0.01 * std::abs(p_start[MU_PY]) + 1e-3);
-        min->SetVariable(MU_PZ, "mu_pz", p_start[MU_PZ],
-                         0.01 * std::abs(p_start[MU_PZ]) + 1e-3);
-
-        min->SetVariable(J1_E, "j1_E", p_start[J1_E], 0.05 * p_start[J1_E]);
-        min->SetVariable(J1_ETA, "j1_eta", p_start[J1_ETA], 0.01);
-        min->SetVariable(J1_PHI, "j1_phi", p_start[J1_PHI], 0.01);
-
-        min->SetVariable(J2_E, "j2_E", p_start[J2_E], 0.05 * p_start[J2_E]);
-        min->SetVariable(J2_ETA, "j2_eta", p_start[J2_ETA], 0.01);
-        min->SetVariable(J2_PHI, "j2_phi", p_start[J2_PHI], 0.01);
-
-        min->SetVariable(J3_E, "j3_E", p_start[J3_E], 0.05 * p_start[J3_E]);
-        min->SetVariable(J3_ETA, "j3_eta", p_start[J3_ETA], 0.01);
-        min->SetVariable(J3_PHI, "j3_phi", p_start[J3_PHI], 0.01);
-
-        min->SetVariable(J4_E, "j4_E", p_start[J4_E], 0.05 * p_start[J4_E]);
-        min->SetVariable(J4_ETA, "j4_eta", p_start[J4_ETA], 0.01);
-        min->SetVariable(J4_PHI, "j4_phi", p_start[J4_PHI], 0.01);
-
-        min->SetVariable(MET_X, "metx", p_start[MET_X], 5.0);
-        min->SetVariable(MET_Y, "mety", p_start[MET_Y], 5.0);
-
-        min->SetVariable(NU_PZ, "nu_pz", p_start[NU_PZ], 10.0);
-
-        bool ok = min->Minimize();
-
-        if (!ok) {
-            delete min;
-            return result;
-        }
-
-        const double *xs = min->X();
-
-        result.valid = true;
-        result.minValue = min->MinValue();
-
-        for (int i = 0; i < N_PAR; ++i) {
-            result.pfit[i] = xs[i];
-        }
-
-        delete min;
-        return result;
-    }
-    ROOT::Math::PxPyPzEVector muonFromPxPyPz(double px, double py, double pz) {
-        const double mMu = 0.105658; // GeV
-
-        double E = std::sqrt(px * px + py * py + pz * pz + mMu * mMu);
-
-        return ROOT::Math::PxPyPzEVector(px, py, pz, E);
-    }
-
-    ROOT::Math::PxPyPzEVector jetFromEetaPhi(double E, double eta, double phi) {
-        double pt = E / std::cosh(eta);
-
-        double px = pt * std::cos(phi);
-        double py = pt * std::sin(phi);
-        double pz = pt * std::sinh(eta);
-
-        return ROOT::Math::PxPyPzEVector(px, py, pz, E);
-    }
-    ROOT::Math::PxPyPzEVector neutrinoFromMet(double metx, double mety,
-                                              double nupz) {
-        double Enu = std::sqrt(metx * metx + mety * mety + nupz * nupz);
-
-        return ROOT::Math::PxPyPzEVector(metx, mety, nupz, Enu);
-    }
-    double deltaPhi(double phi1, double phi2) {
-        double dphi = phi1 - phi2;
-
-        while (dphi > M_PI) {
-            dphi -= 2.0 * M_PI;
-        }
-
-        while (dphi <= -M_PI) {
-            dphi += 2.0 * M_PI;
-        }
-
-        return dphi;
-    }
-
-    bool isPhiIndex(int i) {
-        return i == J1_PHI || i == J2_PHI || i == J3_PHI || i == J4_PHI;
-    }
-
-    double chi2Diagonal(const double *p,
-                        const std::array<double, N_MEAS> &x_meas,
-                        const std::array<double, N_MEAS> &sigma) {
+    double chi2Diagonal(const std::vector<FitVar> &vars) {
         double chi2 = 0.0;
 
-        for (int i = 0; i < N_MEAS; ++i) {
-            if (sigma[i] <= 0.0) {
+        for (const auto &v : vars) {
+            if (v.sigma <= 0)
                 continue;
-            }
 
-            double diff;
-
-            if (isPhiIndex(i)) {
-                diff = deltaPhi(p[i], x_meas[i]);
-            } else {
-                diff = p[i] - x_meas[i];
-            }
-
-            double pull = diff / sigma[i];
+            double pull = (v.fitted - v.measured) / v.sigma;
             chi2 += pull * pull;
         }
 
         return chi2;
-    }
-
-    double totalFitFunction(const double *par,
-                            const std::array<double, 17> &x_meas,
-                            const std::array<double, 17> &sigma) {
-        // 1. detector chi2
-        double chi2 = chi2Diagonal(par, x_meas, sigma);
-
-        // 2. build fitted particles
-        auto mu = muonFromPxPyPz(par[0], par[1], par[2]);
-
-        auto j1 = jetFromEetaPhi(par[3], par[4], par[5]);
-        auto j2 = jetFromEetaPhi(par[6], par[7], par[8]);
-        auto j3 = jetFromEetaPhi(par[9], par[10], par[11]);
-        auto j4 = jetFromEetaPhi(par[12], par[13], par[14]);
-
-        auto nu = neutrinoFromMet(par[15], par[16], par[17]);
-
-        // 3. build W and top candidates
-        auto W_had = j1 + j2;
-        auto W_lep = mu + nu;
-
-        auto top_had = W_had + j3;
-        auto top_lep = W_lep + j4;
-
-        // 4. constraints
-        double C1 = W_had.M() - 80.4;
-        double C2 = W_lep.M() - 80.4;
-        double C3 = top_had.M() - top_lep.M();
-
-        // 5. constraint penalty
-        double sigmaW = 5.0;   // start loose
-        double sigmaTop = 5.0; // start loose
-
-        double constraintChi2 = std::pow(C1 / sigmaW, 2) +
-                                std::pow(C2 / sigmaW, 2) +
-                                std::pow(C3 / sigmaTop, 2);
-
-        return chi2 + constraintChi2;
     }
 
     double jetSigmaE(double E, double eta) {
@@ -272,23 +74,24 @@ class CreateTuple {
         return rel * E;
     }
 
-    double jetSigmaPhi() {
-        // if (std::abs(eta) < 0.8)
-        // return 0.04;
-        return 0.1;
+    double jetSigmaPhi(double eta) {
+        if (std::abs(eta) < 0.8)
+            return 0.04;
+        return 0.05;
     }
 
-    double jetSigmaEta() {
-        // if (std::abs(eta) < 0.8)
-        // return 0.04;
-        return 0.1;
+    double jetSigmaEta(double eta) {
+        if (std::abs(eta) < 0.8)
+            return 0.04;
+        return 0.05;
     }
     double metSigma() {
-        return 12.0; // GeV
+        return 4.0; // GeV
     }
 
-    double muSigma(const double p) {
-        return 0.1 * p; // GeV
+    double muSigma() {
+        return 0.05 * (std::sqrt(mu1_Px * mu1_Px + mu1_Pz * mu1_Pz +
+                                 mu1_Pz * mu1_Pz)); // GeV
     }
 
     /**
@@ -384,7 +187,7 @@ class CreateTuple {
 
     float MET_pt;
 
-    float weight, chi2, permutation_weight;
+    float weight;
     float MCtop_mass_hadronic, MCtop_mass_leptonic;
     float W_leptonic_mass, W_hadronic_mass, top_hadronic_mass_1,
         top_hadronic_mass_2, top_leptoninc_mass_1, top_leptoninc_mass_2,
@@ -474,9 +277,6 @@ void CreateTuple::setBranchesAddressesOutput() {
                         "N_valid_jets_tot/i");
     tree_output->Branch("diMuon_mass", &diMuon_mass, "diMuon_mass/f");
     tree_output->Branch("weight", &weight, "weight/f");
-    tree_output->Branch("chi2", &chi2, "chi2/f");
-    tree_output->Branch("permutation_weight", &permutation_weight,
-                        "permutation_weight/f");
 
     tree_output->Branch("W_leptonic_mass", &W_leptonic_mass,
                         "W_leptonic_mass/f");
@@ -801,14 +601,11 @@ void CreateTuple::fillOutputTree(TString channel) {
         const float BTAG_CUT = 1.;
         std::vector<int> valid_jets_idx;
         std::vector<int> valid_b_jets_idx;
-        std::vector<int> valid_jets_tot_idx;
 
         // std::cout << "---------------------" << std::endl;
         for (int jet = 0; jet < NJet; ++jet) {
             if (!Jet_ID[jet])
                 continue;
-
-            valid_jets_tot_idx.push_back(jet);
 
             if (Jet_btag[jet] > BTAG_CUT) {
                 valid_b_jets_idx.push_back(jet);
@@ -864,7 +661,7 @@ void CreateTuple::fillOutputTree(TString channel) {
         // continue;
         //}
         if (N_valid_jets_tot < 4) {
-            // tree_output->Fill();
+            //tree_output->Fill();
             continue;
         }
 
@@ -903,6 +700,7 @@ void CreateTuple::fillOutputTree(TString channel) {
                 ROOT::Math::PxPyPzEVector W_vector = jet1_vector + jet2_vector;
                 float W_vector_mass = W_vector.M();
                 float mass_diff = std::abs(W_vector_mass - W_MASS);
+
                 if (mass_diff < dijet_mass_diff) {
                     dijet_mass_diff = mass_diff;
                     W_hadronic_mass = W_vector_mass;
@@ -939,141 +737,30 @@ void CreateTuple::fillOutputTree(TString channel) {
         top_leptoninc_mass_1 = (mu_vector + nu_vector + b1_vector).M();
         top_leptoninc_mass_2 = (mu_vector + nu_vector + b2_vector).M();
 
-        // if (std::abs(top_hadronic_mass_1 - top_leptoninc_mass_2) <
-        // std::abs(top_hadronic_mass_2 - top_leptoninc_mass_2)) {
-        // top_hadronic_mass = top_hadronic_mass_1;
-        // top_leptoninc_mass = top_leptoninc_mass_2;
-        //} else {
-        // top_hadronic_mass = top_hadronic_mass_2;
-        // top_leptoninc_mass = top_leptoninc_mass_1;
-        //}
+        if (std::abs(top_hadronic_mass_1 - top_leptoninc_mass_2) <
+            std::abs(top_hadronic_mass_2 - top_leptoninc_mass_2)) {
+            top_hadronic_mass = top_hadronic_mass_1;
+            top_leptoninc_mass = top_leptoninc_mass_2;
+        } else {
+            top_hadronic_mass = top_hadronic_mass_2;
+            top_leptoninc_mass = top_leptoninc_mass_1;
+        }
+        std::vector<FitVar> vars;
+        vars.push_back({mu1_Px, mu1_Px, muSigma()});
+        vars.push_back({mu1_Py, mu1_Py, muSigma()});
+        vars.push_back({mu1_Pz, mu1_Pz, muSigma()});
+        vars.push_back({mu1_Px, mu1_Px, muSigma()});
+        vars.push_back({mu1_Py, mu1_Py, muSigma()});
+        vars.push_back({mu1_Pz, mu1_Pz, muSigma()});
 
-        double p_mu =
-            std::sqrt(mu1_Px * mu1_Px + mu1_Py * mu1_Py + mu1_Pz * mu1_Pz);
-        double sigmaMu = muSigma(p_mu);
-        std::array<double, 18> p;      // fit parameters, used by Minuit
-        std::array<double, 17> x_meas; // measured detector values
-        std::array<double, 17> sigma;  // detector resolutions
         std::cout << "Output Tuple filled" << std::endl;
-        p[0] = mu1_Px;
-        p[1] = mu1_Py;
-        p[2] = mu1_Pz;
-
-        x_meas[0] = mu1_Px;
-        x_meas[1] = mu1_Py;
-        x_meas[2] = mu1_Pz;
-
-        sigma[0] = sigmaMu;
-        sigma[1] = sigmaMu;
-        sigma[2] = sigmaMu;
-
-        // --------------------
-        // Four jets
-        // --------------------
-        for (size_t i = 0; i < 4; ++i) {
-            int idx = valid_jets_tot_idx[i];
-
-            ROOT::Math::PxPyPzEVector jet_vector(Jet_Px[idx], Jet_Py[idx],
-                                                 Jet_Pz[idx], Jet_E[idx]);
-
-            double E = Jet_E[idx];
-            double eta = jet_vector.Eta();
-            double phi = jet_vector.Phi();
-
-            double jet_sigma_E = jetSigmaE(E, eta);
-            double sigma_eta = jetSigmaEta();
-            double sigma_phi = jetSigmaPhi();
-
-            int base = 3 + 3 * i;
-
-            p[base + 0] = E;
-            p[base + 1] = eta;
-            p[base + 2] = phi;
-
-            x_meas[base + 0] = E;
-            x_meas[base + 1] = eta;
-            x_meas[base + 2] = phi;
-
-            sigma[base + 0] = jet_sigma_E;
-            sigma[base + 1] = sigma_eta;
-            sigma[base + 2] = sigma_phi;
-        }
-
-        // --------------------
-        // MET
-        // --------------------
-        p[15] = MET_px;
-        p[16] = MET_py;
-
-        x_meas[15] = MET_px;
-        x_meas[16] = MET_py;
-
-        sigma[15] = 12.0;
-        sigma[16] = 12.0;
-
-        // --------------------
-        // Neutrino pz
-        // --------------------
-        // This is fitted, but not measured.
-        // So it goes in p[], but NOT in x_meas[] or sigma[].
-        p[17] = 0.0; // or your neutrino pz solution
-                     // chi2Diagonal(vars);
-
-        FitResult fit = minimizeEvent(p, x_meas, sigma);
-
-        if (!fit.valid) {
-            std::cout << "Fit failed\n";
-            return;
-        }
-
-        std::cout << "Fit succeeded\n";
-        std::cout << "Minimum value = " << fit.minValue << std::endl;
-
-        auto mu_fit =
-            muonFromPxPyPz(fit.pfit[MU_PX], fit.pfit[MU_PY], fit.pfit[MU_PZ]);
-
-        auto j1_fit =
-            jetFromEetaPhi(fit.pfit[J1_E], fit.pfit[J1_ETA], fit.pfit[J1_PHI]);
-
-        auto j2_fit =
-            jetFromEetaPhi(fit.pfit[J2_E], fit.pfit[J2_ETA], fit.pfit[J2_PHI]);
-
-        auto j3_fit =
-            jetFromEetaPhi(fit.pfit[J3_E], fit.pfit[J3_ETA], fit.pfit[J3_PHI]);
-
-        auto j4_fit =
-            jetFromEetaPhi(fit.pfit[J4_E], fit.pfit[J4_ETA], fit.pfit[J4_PHI]);
-
-        auto nu_fit =
-            neutrinoFromMet(fit.pfit[MET_X], fit.pfit[MET_Y], fit.pfit[NU_PZ]);
-
-        auto W_had_fit = j1_fit + j2_fit;
-        auto W_lep_fit = mu_fit + nu_fit;
-
-        auto top_had_fit = W_had_fit + j3_fit;
-        auto top_lep_fit = W_lep_fit + j4_fit;
-
-        double mW_had_fit = W_had_fit.M();
-        double mW_lep_fit = W_lep_fit.M();
-
-        top_hadronic_mass = top_had_fit.M();
-        top_leptoninc_mass = top_lep_fit.M();
-
-        std::cout << "mW_had_fit = " << mW_had_fit << std::endl;
-        std::cout << "mW_lep_fit = " << mW_lep_fit << std::endl;
-        std::cout << "mt_had_fit = " << top_hadronic_mass << std::endl;
-        std::cout << "mt_lep_fit = " << top_leptoninc_mass << std::endl;
-        chi2 = chi2Diagonal(fit.pfit.data(), x_meas, sigma);
-        permutation_weight = std::exp(-0.5 * chi2);
-
-        std::cout << "xi = " << chi2 << std::endl;
-        tree_output->Fill();
     }
 }
 
 double CreateTuple::CalculateNeutrinoPz(double mu_E, double mu_px, double mu_py,
                                         double mu_pz, double nu_px,
                                         double nu_py) {
+
     double Lambda = (W_MASS * W_MASS - MU_MASS * MU_MASS) / 2.0 +
                     (mu_px * nu_px) + (mu_py * nu_py);
 
@@ -1101,8 +788,7 @@ double CreateTuple::CalculateNeutrinoPz(double mu_E, double mu_px, double mu_py,
             pz_nu = pz2;
         }
     }
-    // Scenario B: Discriminant is Negative (Complex roots,
-    // mismeasurement)
+    // Scenario B: Discriminant is Negative (Complex roots, mismeasurement)
     else {
         // Set D = 0 and just take the real part
         pz_nu = -B / (2.0 * A);
@@ -1112,6 +798,7 @@ double CreateTuple::CalculateNeutrinoPz(double mu_E, double mu_px, double mu_py,
 }
 
 void CreateTuple::saveTree() {
+
     std::cout << "Events in the final tuples: " << tree_output->GetEntries()
               << std::endl;
     output_file = new TFile(output_directory + output_name, "RECREATE");

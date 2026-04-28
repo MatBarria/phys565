@@ -3,7 +3,7 @@ make -j4
 python3 script/run_tuples.py 
 cd ./data/proccess_tuples
 bash hadd.sh
+cd ../..
+cd python 
+python3 get_Xs.py 
 cd ..
-#cd python 
-#python3 draw_histograms.py 
-#cd ..
