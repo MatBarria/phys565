@@ -5,12 +5,23 @@ import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
 import uproot as ur
-from utils.constants import (ALL_BRANCHES, BACKGROUND_SOURCES, N_BINS,
-                             SIGNAL_SOURCES, SOURCES_LABEL, USEFUL_BRANCHES,
-                             X_RANGE)
-from utils.helper import (clean_null_values, get_background_label_list,
-                          get_canvas, get_color_list, get_histograms_ratio,
-                          save_figure)
+from utils.constants import (
+    ALL_BRANCHES,
+    BACKGROUND_SOURCES,
+    N_BINS,
+    SIGNAL_SOURCES,
+    SOURCES_LABEL,
+    USEFUL_BRANCHES,
+    X_RANGE,
+)
+from utils.helper import (
+    clean_null_values,
+    get_background_label_list,
+    get_canvas,
+    get_color_list,
+    get_histograms_ratio,
+    save_figure,
+)
 
 final_bkg_sources = []
 
@@ -197,6 +208,8 @@ def draw_data_and_simul_and_ratio(
         else:
             tot_bg_numpy_hist = tot_bg_numpy_hist + bg_hist
 
+    tot_bg_numpy_hist = tot_bg_numpy_hist + signal_histograms_list[0]
+
     ratio_hist, ratio_error = get_histograms_ratio(data_histogram[0], tot_bg_numpy_hist)
 
     hep.histplot(
@@ -225,11 +238,11 @@ def draw_data_and_simul_and_ratio(
 
 
 # for variable in USEFUL_BRANCHES:
-    # draw_data_and_simul_and_ratio(
-    # variable,
-    # BACKGROUND_SOURCES,
-    # SIGNAL_SOURCES,
-    # )
+# draw_data_and_simul_and_ratio(
+# variable,
+# BACKGROUND_SOURCES,
+# SIGNAL_SOURCES,
+# )
 draw_data_and_simul_and_ratio(
     "top_hadronic_mass",
     BACKGROUND_SOURCES,
@@ -241,4 +254,22 @@ draw_data_and_simul_and_ratio(
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     use_permutation_weight=True,
+)
+draw_data_and_simul_and_ratio(
+    "W_hadronic_mass_reco",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    use_permutation_weight=True,
+)
+draw_data_and_simul_and_ratio(
+    "W_leptonic_mass_reco",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    use_permutation_weight=True,
+)
+draw_data_and_simul_and_ratio(
+    "chi2",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    use_permutation_weight=False,
 )

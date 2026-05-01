@@ -6,4 +6,5 @@ bash hadd.sh
 cd ../..
 cd python 
 python3 get_Xs.py 
+python3 draw_histograms.py
 cd ..

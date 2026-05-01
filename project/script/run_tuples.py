@@ -2,7 +2,7 @@ import subprocess
 import os
 
 # Define the path to your C++ executable
-cpp_executable = "./bin/CreateTuples"
+cpp_executable = "./bin/main"
 base_input_directory = "/home/truga/projects/phys565/project/"
 output_directory = "/home/truga/projects/phys565/project/data/proccess_tuples/"
 os.makedirs(output_directory, exist_ok=True)
