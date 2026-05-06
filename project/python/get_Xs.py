@@ -106,38 +106,49 @@ if __name__ == "__main__":
     signal_tree = ur.open(tuple_path + "signal.root:tree_output")
     signal_branches = signal_tree.arrays(variables, library="np")  # type: ignore
 
-    data_tree = ur.open(tuple_path + "data_tuples.root:tree_output")
+    data_tree = ur.open(tuple_path + "data_tuples_JES1p00.root:tree_output")
     data_branches = data_tree.arrays(variables, library="np")  # type: ignore
 
     bool_list_bkg = np.ones_like(background_branches[variables[0]], dtype=bool)
     bool_list_bkg = (bool_list_bkg) & (background_branches["triggerIsoMu24"] == 1)
     bool_list_bkg = (bool_list_bkg) & (background_branches["NMuon_valid"] > 0)
-    bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_jets_tot"] >= 3)
+    # bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_jets_tot"] >= 4)
     bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_b_jets"] >= 1)
-    bool_list_bkg = (bool_list_bkg) & (background_branches["MET_pt"] >= 16)
+    # bool_list_bkg = (bool_list_bkg) & (background_branches["MET_pt"] >= 16)
 
     bool_list_sig = np.ones_like(signal_branches[variables[0]], dtype=bool)
     bool_list_sig = (bool_list_sig) & (signal_branches["NMuon_valid"] > 0)
     bool_list_sig_trigger = (bool_list_sig) & (signal_branches["triggerIsoMu24"] == 1)
     bool_list_sig_Muon = bool_list_sig
-    bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_jets_tot"] >= 3)
+    # bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_jets_tot"] >= 4)
     bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_b_jets"] >= 1)
-    bool_list_sig = (bool_list_sig) & (signal_branches["MET_pt"] >= 16)
+    # bool_list_sig = (bool_list_sig) & (signal_branches["MET_pt"] >= 16)
 
     bool_list_data = np.ones_like(data_branches[variables[0]], dtype=bool)
     bool_list_data = (bool_list_data) & (data_branches["triggerIsoMu24"] == 1)
     bool_list_data = (bool_list_data) & (data_branches["NMuon_valid"] > 0)
-    bool_list_data = (bool_list_data) & (data_branches["N_valid_jets_tot"] >= 3)
+    # bool_list_data = (bool_list_data) & (data_branches["N_valid_jets_tot"] >= 4)
     bool_list_data = (bool_list_data) & (data_branches["N_valid_b_jets"] >= 1)
-    bool_list_data = (bool_list_data) & (data_branches["MET_pt"] >= 16)
+    # bool_list_data = (bool_list_data) & (data_branches["MET_pt"] >= 16)
 
     background_branches["weight"] = background_branches["weight"] * 0.9
     # signal_branches["weight"] = signal_branches["weight"] * 0.9
 
     n_bkg = np.sum(background_branches["weight"][bool_list_bkg])
     n_obs = len(data_branches["mu1_Pt"][bool_list_data])
-    dn_bkg_stat = math.sqrt(np.sum(background_branches["weight"] ** 2))
+    dn_bkg_stat = math.sqrt(np.sum(background_branches["weight"][bool_list_bkg] ** 2))
+
     lumi_pb = 50.0
+    # 525.9 +/- 26.5843
+
+    # dn_obs_stat = 16.7797
+    # n_bkg = 0
+    # n_obs = 133.048
+
+    dn_obs_stat = 17.6393
+    n_bkg = 0
+    n_obs = 506.941
+    dn_bkg_stat = 0
 
     n_trigger_total = np.sum(signal_branches["weight"][bool_list_sig_Muon])
     n_trigger = np.sum(signal_branches["weight"][bool_list_sig_trigger])
@@ -151,7 +162,7 @@ if __name__ == "__main__":
 
     # trigger_efficiency = 0.12634833  # 1001.7932/7928.8203
     # acceptance_efficiency = 0.056316022  # 56.417007/1001.7932
-    trigger_efficiency = n_trigger/ n_trigger_total  # 1001.7932/7928.8203
+    trigger_efficiency = n_trigger / n_trigger_total  # 1001.7932/7928.8203
     acceptance_efficiency = n_acceptance / n_acceptance_total  # 56.417007/1001.7932
     print(trigger_efficiency)
     print(acceptance_efficiency)
@@ -167,8 +178,8 @@ if __name__ == "__main__":
         acceptance_efficiency=acceptance_efficiency,
         n_trigger_total=n_trigger_total,
         n_acceptance_total=n_acceptance_total,
-        dn_obs_stat=None,  # uses sqrt(n_obs)
-        # dn_bkg_stat=dn_bkg_stat,
+        # dn_obs_stat=dn_obs_stat,  # uses sqrt(n_obs)
+        dn_bkg_stat=dn_bkg_stat,
         dlumi=dlumi,
         # dn_bkg_syst=dn_bkg_syst,
     )

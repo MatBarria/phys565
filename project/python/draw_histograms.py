@@ -1,4 +1,5 @@
 import matplotlib
+import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -16,10 +17,13 @@ from utils.constants import (
 )
 from utils.helper import (
     clean_null_values,
+    draw_fit,
+    draw_fitted_xs,
     get_background_label_list,
     get_canvas,
     get_color_list,
     get_histograms_ratio,
+    get_x_label,
     save_figure,
 )
 
@@ -33,7 +37,6 @@ def get_histograms_from_tuple(
     use_dimuon_mass_cut=False,
     use_permutation_weight=False,
 ):
-
     # if not use_puweight:
     # variables.append("pileup_weight")
 
@@ -42,16 +45,25 @@ def get_histograms_from_tuple(
 
     # variable_bin = variables[0]
 
+    # tuple_path = "../data/proccess_tuples/no_cuts/"
+    # if use_permutation_weight:
     tuple_path = "../data/proccess_tuples/"
 
     for source in sources:
-        file_name = source + "_tuples.root:tree_output"
+        file_name = source + "_tuples_JES1p00.root:tree_output"
 
         with ur.open(tuple_path + file_name) as file:
             branches = file.arrays(variables, library="np")
 
+        # if use_permutation_weight:
+        # branches["weight"] = (
+        # branches["weight"]
+        # * branches["permutation_weight"]
+        # / branches["permutation_weight_sum"]
+        # )
+        weight_var = "weight"
         if use_permutation_weight:
-            branches["weight"] = branches["weight"] * branches["permutation_weight"]
+            weight_var = "total_weight"
 
         bool_list = np.ones_like(branches[variables[0]], dtype=bool)
 
@@ -59,8 +71,9 @@ def get_histograms_from_tuple(
             bool_list = (bool_list) & (branches["triggerIsoMu24"] == 1)
         if variables[0] != "NMuon_valid":
             bool_list = (bool_list) & (branches["NMuon_valid"] > 0)
-        bool_list = (bool_list) & (branches["N_valid_jets_tot"] >= 4)
         bool_list = (bool_list) & (branches["N_valid_b_jets"] >= 1)
+        if variables[0] != "N_valid_jets_tot" and variables[0] != "N_valid_b_jets":
+            bool_list = (bool_list) & (branches["N_valid_jets_tot"] >= 4)
 
         for var in variables:
             # if var in ["top_hadronic_mass_1", "top_hadronic_mass_2"]:
@@ -73,7 +86,7 @@ def get_histograms_from_tuple(
             branches[variables[0]],
             bins=N_BINS[variables[0]],
             range=X_RANGE[variables[0]],
-            weights=(branches["weight"]),
+            weights=(branches[weight_var]),
         )
         # if np.sum(histogram) ==0:
         # sources.remove(source)
@@ -93,7 +106,9 @@ def draw_data_and_simul_and_ratio(
     signal_sources,
     use_dimuon_mass_cut=False,
     use_permutation_weight=False,
+    y_label=" ",
 ):
+
     plt.style.use(hep.style.CMS)
 
     print("*" * len("****** PLOTTING " + variable + " *****"))
@@ -110,16 +125,15 @@ def draw_data_and_simul_and_ratio(
         "N_valid_jets_tot",
         "N_valid_b_jets",
         "permutation_weight",
+        # "total_weight",
     ]
+    if use_permutation_weight:
+        variables.append("total_weight"),
+        variables.append("total_weight_norm"),
     variables = list(set(variables))
     variables.insert(0, variables.pop(variables.index(variable)))
 
     # print(variables)
-    # if variable == "top_hadronic_mass":
-    # variables.append("top_hadronic_mass_1")
-    # variables.append("top_hadronic_mass_2")
-
-    print(variables)
 
     data_histogram, data_bins = get_histograms_from_tuple(
         ["data"],
@@ -182,13 +196,51 @@ def draw_data_and_simul_and_ratio(
     hep.cms.label(
         data="True",
         label=label,
-        year=2011,
+        # year=2011,
         com="7",
         lumi="50",
         ax=axs[0],
     )
 
+    if not use_permutation_weight and variable in [
+        "N_valid_jets_tot",
+        "N_valid_b_jets",
+    ]:
+
+        draw_fitted_xs(axs[0], variable, 506.941, 32.12, 1888.65, 49.1959)
+
+    if variable == "top_hadronic_mass_2":
+        crystal_ball_params = [
+            163.753,
+            1.42987,  # mean, mean_err
+            23.3245,
+            1.06441,  # sigma, sigma_err
+            -0.860257,
+            0.156361,  # alpha, alpha_err
+            2.75,
+            1.20396,  # n, n_err
+            229.696,
+            0.0,  # sumW, sumW_err
+            0,
+            0.0,  # fit_status
+            3,
+            0.0,  # cov_quality
+            1152.91,
+            0.0,  # minNll
+        ]
+
+        draw_fit(
+            axs=axs[0],
+            parameters=crystal_ball_params,
+            mass_min=X_RANGE[variable][0],
+            mass_max=X_RANGE[variable][1],
+            n_bins=N_BINS[variable],
+            label="Crystal Ball",
+        )
+
     axs[0].set_ylabel(r"Events")
+    if y_label != " ":
+        axs[0].set_ylabel(y_label)
     axs[0].set_ylim(
         0.1,
         1000 * np.max(np.concatenate([data_histogram[0], signal_histograms_list[0]])),
@@ -196,7 +248,7 @@ def draw_data_and_simul_and_ratio(
     axs[0].set_xlim(data_bins[0][0], data_bins[0][-1])
     # axs[0].set_yscale("log")
     axs[0].set_ylim(0.0, 1.4 * np.max(data_histogram))
-    axs[0].legend(frameon=False, loc="upper right", ncols=2)
+    axs[0].legend(frameon=False, loc="upper right", ncols=2, fontsize=15)
     axs[0].tick_params(axis="x", which="both", bottom=True, top=True, labelbottom=False)
 
     plt.axhline(y=1, color="grey", linestyle="--", alpha=0.5)
@@ -225,10 +277,13 @@ def draw_data_and_simul_and_ratio(
     axs[1].set_ylabel("Data/MC", loc="center")
     axs[1].set_ylim(0.5, 1.5)
     axs[1].set_xlim(data_bins[0][0], data_bins[0][-1])
-    axs[1].set_xlabel(variable)
+    axs[1].set_xlabel(get_x_label(variable))
 
     output_directory = "../plots/ratio-proccessed/"
+
     output_name = variable + "_MCData_ratio"
+    if use_permutation_weight:
+        output_name += "_per_weight"
 
     # output_directory = get_output_directory(variable, output_directory, variables_type)
 
@@ -243,26 +298,59 @@ def draw_data_and_simul_and_ratio(
 # BACKGROUND_SOURCES,
 # SIGNAL_SOURCES,
 # )
+# draw_data_and_simul_and_ratio(
+# "N_valid_jets_tot",
+# BACKGROUND_SOURCES,
+# SIGNAL_SOURCES,
+# )
+# draw_data_and_simul_and_ratio(
+# "N_valid_b_jets",
+# BACKGROUND_SOURCES,
+# SIGNAL_SOURCES,
+# )
 draw_data_and_simul_and_ratio(
     "top_hadronic_mass",
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     use_permutation_weight=True,
+    y_label=r"Sum of permutations weights/ 5 Gev",
 )
 draw_data_and_simul_and_ratio(
-    "top_leptoninc_mass",
+    "top_hadronic_mass",
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
-    use_permutation_weight=True,
+    # use_permutation_weight=True,
+    y_label=r"Permutations / 5 Gev",
+)
+draw_data_and_simul_and_ratio(
+    "top_hadronic_mass_reco",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    # use_permutation_weight=True,
+    y_label=r"Permutations / 5 Gev",
+)
+draw_data_and_simul_and_ratio(
+    "W_hadronic_mass_reco",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    # use_permutation_weight=true,
+    y_label=r"permutations / 5 gev",
 )
 draw_data_and_simul_and_ratio(
     "W_hadronic_mass_reco",
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     use_permutation_weight=True,
+    y_label=r"sum of permutations weights/ 5 gev",
 )
 draw_data_and_simul_and_ratio(
     "W_leptonic_mass_reco",
+    BACKGROUND_SOURCES,
+    SIGNAL_SOURCES,
+    use_permutation_weight=True,
+)
+draw_data_and_simul_and_ratio(
+    "NMuon_valid",
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     use_permutation_weight=True,

@@ -17,7 +17,8 @@
 
 class CreateTuple {
   public:
-    CreateTuple(TString input, TString output, TString channel);
+    CreateTuple(TString input, TString output, TString channel,
+                float JES_input);
 
     virtual ~CreateTuple();
 
@@ -122,12 +123,14 @@ class CreateTuple {
 
     float MET_pt;
 
-    float weight, chi2, permutation_weight;
+    float JES;
+    float weight, chi2, permutation_weight, total_weight,total_weight_norm,
+        permutation_weight_sum;
     float MCtop_mass_hadronic, MCtop_mass_leptonic;
     float W_leptonic_mass, W_hadronic_mass, W_leptonic_mass_reco,
         W_hadronic_mass_reco, top_hadronic_mass_1, top_hadronic_mass_2,
         top_leptoninc_mass_1, top_leptoninc_mass_2, top_hadronic_mass,
-        top_leptoninc_mass;
+        top_leptoninc_mass, top_hadronic_mass_reco;
 };
 
 #endif // if LIB_CreateTuple_H

@@ -18,9 +18,17 @@ plt.style.use(hep.style.CMS)
 
 def draw_sig_and_bg(variable):
 
-    tuple_path = "../data/proccess_tuples/"
+    tuple_path = "../data/proccess_tuples/no_cuts/"
 
-    variables = [variable, "weight", "triggerIsoMu24", "Nlep_valid", "NMuon_valid", "N_valid_jets", "N_valid_b_jets"]
+    variables = [
+        variable,
+        "weight",
+        "triggerIsoMu24",
+        "Nlep_valid",
+        "NMuon_valid",
+        "N_valid_jets_tot",
+        "N_valid_b_jets",
+    ]
     variables = list(set(variables))
     print("PLOTTING: ", variable)
     background_tree = ur.open(tuple_path + "background.root:tree_output")
@@ -33,18 +41,18 @@ def draw_sig_and_bg(variable):
     bool_list_bkg = (bool_list_bkg) & (background_branches["triggerIsoMu24"] == 1)
     bool_list_sig = np.ones_like(signal_branches[variable], dtype=bool)
     bool_list_sig = (bool_list_sig) & (signal_branches["triggerIsoMu24"] == 1)
-    if variable != "N_valid_jets":
-        bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_jets"] >= 2)
-        bool_list_sig= (bool_list_sig) & (signal_branches["N_valid_jets"] >= 2)
+    if variable != "N_valid_jets_tot":
+        bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_jets_tot"] >= 4)
+        bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_jets_tot"] >= 4)
     if variable != "N_valid_b_jets":
-        bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_b_jets"] >= 2)
-        bool_list_sig= (bool_list_sig) & (signal_branches["N_valid_b_jets"] >= 2)
+        bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_b_jets"] >= 1)
+        bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_b_jets"] >= 1)
     # if variable != "NMuon_valid":
-        # bool_list_bkg = (bool_list_bkg) & (background_branches["NMuon_valid"] == 1)
-        # bool_list_sig = (bool_list_sig) & (signal_branches["NMuon_valid"] == 1)
-    if variable != "Nlep_valid":
-        bool_list_bkg = (bool_list_bkg) & (background_branches["Nlep_valid"] == 1)
-        bool_list_sig = (bool_list_sig) & (signal_branches["Nlep_valid"] == 1)
+    # bool_list_bkg = (bool_list_bkg) & (background_branches["NMuon_valid"] == 1)
+    # bool_list_sig = (bool_list_sig) & (signal_branches["NMuon_valid"] == 1)
+    if variable != "NMuon_valid":
+        bool_list_bkg = (bool_list_bkg) & (background_branches["Nlep_valid"] > 0)
+        bool_list_sig = (bool_list_sig) & (signal_branches["Nlep_valid"] > 0)
 
     for var in variables:
         if var in ["top_hadronic_mass_1", "top_hadronic_mass_2"]:
@@ -67,6 +75,12 @@ def draw_sig_and_bg(variable):
         weights=signal_branches["weight"],
     )
 
+    print("source: sig")
+    print("histo: ", signal_histogram / np.sum(signal_histogram))
+    print("entries: ",  np.sum(signal_histogram))
+    print("source: bkg")
+    print("histo: ", bkg_histogram / np.sum(bkg_histogram))
+    print("entries: ",  np.sum(bkg_histogram))
     if np.sum(bkg_histogram) != 0:
         bkg_histogram_norm = bkg_histogram / np.sum(bkg_histogram)
     else:
@@ -146,5 +160,7 @@ def draw_sig_and_bg(variable):
     plt.close()
 
 
-for var in USEFUL_BRANCHES:
-    draw_sig_and_bg(var)
+# for var in USEFUL_BRANCHES:
+# draw_sig_and_bg(var)
+draw_sig_and_bg("N_valid_jets_tot")
+draw_sig_and_bg("N_valid_b_jets")

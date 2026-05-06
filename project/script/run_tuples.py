@@ -1,5 +1,5 @@
-import subprocess
 import os
+import subprocess
 
 # Define the path to your C++ executable
 cpp_executable = "./bin/main"
@@ -8,15 +8,18 @@ output_directory = "/home/truga/projects/phys565/project/data/proccess_tuples/"
 os.makedirs(output_directory, exist_ok=True)
 
 datasets = ["dy", "qcd", "wjets", "single_top", "ww", "wz", "zz", "ttbar", "data"]
+# JESs = ["0.97", "1", "1.03"]
+JESs = ["1.0"]
 
 
 # List of input arguments
 input_arguments = []
 
 # ./bin/CreateHistograms /eos/uscms/store/user/csanmart/analyzer_HiggsMuMu/MC_background/TTto2L2Nu_Summer22/SumGenWeight.root ZZto4Lhist.root 2022 ZZto4L F
-for dataset in datasets:
-    input = base_input_directory + "data/tuples/"+ dataset + ".root"
-    input_arguments.append([input, output_directory, dataset])
+for JES in JESs:
+    for dataset in datasets:
+        input = base_input_directory + "data/tuples/" + dataset + ".root"
+        input_arguments.append([input, output_directory, dataset, JES])
 
 # Loop over each set of input arguments and execute the C++ program
 for args in input_arguments:

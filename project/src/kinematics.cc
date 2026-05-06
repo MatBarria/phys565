@@ -6,10 +6,10 @@
 #include <Math/Vector3D.h>
 #include <cmath>
 #include <cstdio>
+#include <iostream>
 FitResult minimizeEvent(const std::array<double, N_PAR> &p_start,
                         const std::array<double, N_MEAS> &x_meas,
-                        const std::array<double, N_MEAS> &sigma,
-                        const float nu_pz) {
+                        const std::array<double, N_MEAS> &sigma) {
     FitResult result;
 
     ROOT::Math::Minimizer *min =
@@ -51,7 +51,7 @@ FitResult minimizeEvent(const std::array<double, N_PAR> &p_start,
     min->SetVariable(J3_ETA, "j3_eta", p_start[J3_ETA], 0.01);
     min->SetVariable(J3_PHI, "j3_phi", p_start[J3_PHI], 0.01);
 
-    //min->SetVariable(J4_E, "j4_E", p_start[J4_E], 0.05 * p_start[J4_E]);
+    // min->SetVariable(J4_E, "j4_E", p_start[J4_E], 0.05 * p_start[J4_E]);
     min->SetVariable(J4_ETA, "j4_eta", p_start[J4_ETA], 0.01);
     min->SetVariable(J4_PHI, "j4_phi", p_start[J4_PHI], 0.01);
 
@@ -170,7 +170,8 @@ double chi2Diagonal(const double *p, const std::array<double, N_MEAS> &x_meas,
 
     // J2_E is not in p. It is solved.
     double j2E = solveJ2E(p[J1_E], p[J1_ETA], p[J1_PHI], p[J2_ETA], p[J2_PHI]);
-
+    if (j2E < 0.0)
+        return 1e10;
     auto j1 = jetFromEetaPhi(p[J1_E], p[J1_ETA], p[J1_PHI], 0.);
     auto j2 = jetFromEetaPhi(j2E, p[J2_ETA], p[J2_PHI], 0.);
     auto j3 = jetFromEetaPhi(p[J3_E], p[J3_ETA], p[J3_PHI], BOTTOM_MASS);
@@ -184,12 +185,13 @@ double chi2Diagonal(const double *p, const std::array<double, N_MEAS> &x_meas,
     auto W_lep = mu + nu;
     auto top_had = W_had + j3;
 
-    double j4E = solveJ4EFromTopEquality(W_lep, top_had.M(), p[J4_ETA],
-                                         p[J4_PHI], x_meas[X_J4_E], BOTTOM_MASS);
-
+    double j4E = solveJ4EFromTopEquality(
+        W_lep, top_had.M(), p[J4_ETA], p[J4_PHI], x_meas[X_J4_E], BOTTOM_MASS);
+    if (j4E < BOTTOM_MASS)
+        return 1e10;
     // auto j4 = jetFromEetaPhi(p[J4_E], p[J4_ETA], p[J4_PHI], W_MASS);
-    //if (j2E < 0.0)
-        //return 1e99;
+    // if (j2E < 0.0)
+    // return 1e99;
 
     addPull(j2E, X_J2_E);
     addPull(p[J2_ETA], X_J2_ETA);
@@ -200,7 +202,7 @@ double chi2Diagonal(const double *p, const std::array<double, N_MEAS> &x_meas,
     addPull(p[J3_PHI], X_J3_PHI);
 
     addPull(j4E, X_J4_E);
-    //addPull(p[J4_E], X_J4_E);
+    // addPull(p[J4_E], X_J4_E);
     addPull(p[J4_ETA], X_J4_ETA);
     addPull(p[J4_PHI], X_J4_PHI);
 
@@ -306,27 +308,28 @@ double jetSigmaE(double E, double eta) {
     }
 
     double rel = std::sqrt(a * a + (b / std::sqrt(E)) * (b / std::sqrt(E)));
+    // std::cout << "rel: " << rel << std::endl;
     return rel * 2 * E;
 };
 
 double jetSigmaPhi() {
     // if (std::abs(eta) < 0.8)
     // return 0.04;
-    return 0.1;
+    return 0.08;
 };
 
 double jetSigmaEta() {
     // if (std::abs(eta) < 0.8)
     // return 0.04;
-    return 0.1;
+    return 0.08;
 };
 double metSigma() {
     return 12.0; // GeV
 };
 
 double muSigma(const double p) {
-    // return 0.1 * p; // GeV
-    return 10; // GeV
+    //return 0.1 * p; // GeV
+     return 10; // GeV
 };
 
 double CalculateNeutrinoPz(double mu_px, double mu_py, double mu_pz,
@@ -428,24 +431,37 @@ double solveJ4EFromTopEquality(const ROOT::Math::PxPyPzEVector &Wlep,
     double qb = -2.0 * Ew * K;
     double qc = K * K + A * A * mb2;
 
-    if (std::abs(qa) < 1e-12)
+    if (std::abs(qa) < 1e-12) {
+        std::cout << "test" << std::endl;
         return -1.0;
+    }
 
     double disc = qb * qb - 4.0 * qa * qc;
 
-    if (disc < 0.0)
-        return -1.0;
-
     double sqrtDisc = std::sqrt(disc);
+    if (disc < 0.0) {
+        // std::cout << "test 2" << disc << std::endl;
+        return -1.0;
+        sqrtDisc = 0;
+    } else {
+        sqrtDisc = std::sqrt(disc);
+    }
 
     double Esol1 = (-qb + sqrtDisc) / (2.0 * qa);
     double Esol2 = (-qb - sqrtDisc) / (2.0 * qa);
 
     bool ok1 = Esol1 >= bMass;
     bool ok2 = Esol2 >= bMass;
+    // bool ok1 = Esol1 >= 0;
+    // bool ok2 = Esol2 >= 0;
 
-    if (!ok1 && !ok2)
+    if (!ok1 && !ok2) {
+        // std::cout << "test 1" << std::endl;
         return -1.0;
+        if (Esol1 > Esol2)
+            return Esol2;
+        return Esol1;
+    }
 
     if (ok1 && !ok2)
         return Esol1;

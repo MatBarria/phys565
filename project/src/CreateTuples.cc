@@ -2,13 +2,21 @@
 #include "../lib/kinematics.h"
 #include <iostream>
 #include <ostream>
-CreateTuple::CreateTuple(TString input, TString output, TString channel) {
+CreateTuple::CreateTuple(TString input, TString output, TString channel,
+                         float JES_input) {
 
     tree_input = new TChain("events");
     tree_output = new TTree("tree_output", "tree_output");
     input_name = input;
     output_directory = output;
-    output_name = channel + "_tuples.root";
+    // output_name = channel + "_tuples.root";
+    JES = JES_input;
+    TString JES_string = Form("%.2f", JES);
+    JES_string.ReplaceAll(".", "p");
+
+    output_name =
+        Form("%s_tuples_JES%s.root", channel.Data(), JES_string.Data());
+
     fillChain();
 }
 
@@ -84,6 +92,11 @@ void CreateTuple::setBranchesAddressesOutput() {
                         "N_valid_jets_tot/i");
     tree_output->Branch("diMuon_mass", &diMuon_mass, "diMuon_mass/f");
     tree_output->Branch("weight", &weight, "weight/f");
+    tree_output->Branch("permutation_weight_sum", &permutation_weight_sum,
+                        "permutation_weight_sum/f");
+    tree_output->Branch("total_weight", &total_weight, "total_weight/f");
+    tree_output->Branch("total_weight_norm", &total_weight_norm,
+                        "total_weight_norm/f");
     tree_output->Branch("chi2", &chi2, "chi2/f");
     tree_output->Branch("permutation_weight", &permutation_weight,
                         "permutation_weight/f");
@@ -106,6 +119,8 @@ void CreateTuple::setBranchesAddressesOutput() {
                         "top_leptoninc_mass_2/f");
     tree_output->Branch("top_hadronic_mass", &top_hadronic_mass,
                         "top_hadronic_mass/f");
+    tree_output->Branch("top_hadronic_mass_reco", &top_hadronic_mass_reco,
+                        "top_hadronic_mass_reco/f");
     tree_output->Branch("top_leptoninc_mass", &top_leptoninc_mass,
                         "top_leptoninc_mass/f");
     tree_output->Branch("mu1_Px", &mu1_Px, "mu1_Px/f");
@@ -311,25 +326,27 @@ void CreateTuple::fillOutputTree(TString channel) {
         mu1_Px = mu1_Py = mu1_Pz = mu1_E = mu1_Iso = mu1_Pt = -1;
         mu2_Px = mu2_Py = mu2_Pz = mu2_E = mu2_Iso = mu2_Pt = -1;
         mu3_Px = mu3_Py = mu3_Pz = mu3_E = mu3_Iso = mu3_Pt = -1;
+        mu1_Iso = -2;
         e1_Px = e1_Py = e1_Pz = e1_E = e1_Iso = e1_Pt = -1;
         e2_Px = e2_Py = e2_Pz = e2_E = e2_Iso = e2_Pt = -1;
         NMuon_valid = Ne_valid = Nlep_valid = 0;
 
-        auto fill_muon = [&](int i, float &px, float &py, float &pz, float &e,
-                             float &iso, float &pt, int &n_valid) {
-            if (NMuon > i) {
-                px = Muon_Px[i];
-                py = Muon_Py[i];
-                pz = Muon_Pz[i];
-                e = Muon_E[i];
-                iso = Muon_Iso[i];
-                pt = std::hypot(px, py);
-                if (pt > 25 && iso < 0.1) {
-                    // if (pt > 25) {
-                    n_valid = n_valid + 1;
-                }
-            }
-        };
+        // auto fill_muon = [&](int i, float &px, float &py, float &pz, float
+        // &e, float &iso, float &pt, int &n_valid) {
+        // if (NMuon > i) {
+        // if (std::hypot(Muon_Px[i], Muon_Py[i]) > 25 &&
+        // Muon_Iso[i] < 2.625) {
+        //// if (pt > 25) {
+        // n_valid = n_valid + 1;
+        // px = Muon_Px[i];
+        // py = Muon_Py[i];
+        // pz = Muon_Pz[i];
+        // e = Muon_E[i];
+        // iso = Muon_Iso[i];
+        // pt = std::hypot(px, py);
+        //}
+        //}
+        //};
 
         auto fill_electron = [&](int i, float &px, float &py, float &pz,
                                  float &e, float &iso, float &pt,
@@ -341,25 +358,64 @@ void CreateTuple::fillOutputTree(TString channel) {
                 e = Electron_E[i];
                 iso = Electron_Iso[i];
                 pt = std::hypot(px, py);
-                if (pt > 25 && iso < 0.1) {
+                if (pt > 25 && iso < 2.6) {
                     // if (pt > 25) {
                     n_valid = n_valid + 1;
                 }
             }
         };
 
-        fill_muon(0, mu1_Px, mu1_Py, mu1_Pz, mu1_E, mu1_Iso, mu1_Pt,
-                  NMuon_valid);
-        fill_muon(1, mu2_Px, mu2_Py, mu2_Pz, mu2_E, mu2_Iso, mu2_Pt,
-                  NMuon_valid);
-        fill_muon(2, mu3_Px, mu3_Py, mu3_Pz, mu3_E, mu3_Iso, mu3_Pt,
-                  NMuon_valid);
+        auto save_muon = [&](int out_index, int in_index) {
+            if (out_index == 0) {
+                mu1_Px = Muon_Px[in_index];
+                mu1_Py = Muon_Py[in_index];
+                mu1_Pz = Muon_Pz[in_index];
+                mu1_E = Muon_E[in_index];
+                mu1_Iso = Muon_Iso[in_index];
+                mu1_Pt = std::hypot(mu1_Px, mu1_Py);
+            } else if (out_index == 1) {
+                mu2_Px = Muon_Px[in_index];
+                mu2_Py = Muon_Py[in_index];
+                mu2_Pz = Muon_Pz[in_index];
+                mu2_E = Muon_E[in_index];
+                mu2_Iso = Muon_Iso[in_index];
+                mu2_Pt = std::hypot(mu2_Px, mu2_Py);
+            } else if (out_index == 2) {
+                mu3_Px = Muon_Px[in_index];
+                mu3_Py = Muon_Py[in_index];
+                mu3_Pz = Muon_Pz[in_index];
+                mu3_E = Muon_E[in_index];
+                mu3_Iso = Muon_Iso[in_index];
+                mu3_Pt = std::hypot(mu3_Px, mu3_Py);
+            }
+        };
+
+        for (int i = 0; i < NMuon; i++) {
+            float pt = std::hypot(Muon_Px[i], Muon_Py[i]);
+            float iso = Muon_Iso[i];
+
+            if (pt > 25 && iso < 2.625) {
+                if (NMuon_valid < 3) {
+                    save_muon(NMuon_valid, i);
+                }
+
+                NMuon_valid++;
+            }
+        }
+
+        // fill_muon(0, mu1_Px, mu1_Py, mu1_Pz, mu1_E, mu1_Iso, mu1_Pt,
+        // NMuon_valid);
+        // fill_muon(1, mu2_Px, mu2_Py, mu2_Pz, mu2_E, mu2_Iso, mu2_Pt,
+        // NMuon_valid);
+        // fill_muon(2, mu3_Px, mu3_Py, mu3_Pz, mu3_E, mu3_Iso, mu3_Pt,
+        // NMuon_valid);
         fill_electron(0, e1_Px, e1_Py, e1_Pz, e1_E, e1_Iso, e1_Pt, Ne_valid);
         fill_electron(1, e2_Px, e2_Py, e2_Pz, e2_E, e2_Iso, e2_Pt, Ne_valid);
 
+        bool ALL_EVENTS = false;
         MC_lepton_mass = -1;
         Nlep_valid = NMuon_valid + Ne_valid;
-        if (NMuon_valid != 1)
+        if (NMuon_valid == 0 && !ALL_EVENTS)
             continue;
         MCtop_mass_hadronic = MCtop_mass_leptonic = -1;
         NMuon_valid_mc = Ne_valid_mc = Nlep_valid_mc = -1;
@@ -472,22 +528,36 @@ void CreateTuple::fillOutputTree(TString channel) {
         W_leptonic_mass = W_hadronic_mass = top_hadronic_mass_1 =
             top_hadronic_mass_2 = top_leptoninc_mass_1 = top_leptoninc_mass_2 =
                 -1;
-        // if (N_valid_b_jets < 2 || N_valid_jets < 2) {
-        //// tree_output->Fill();
-        // continue;
-        //}
+        if (N_valid_b_jets >= 2) {
+            N_valid_b_jets = 2;
+        }
+        if (N_valid_jets_tot >= 5) {
+            N_valid_jets_tot = 5;
+        }
+
         chi2 = 0;
         permutation_weight = 0;
+
+        if (ALL_EVENTS) {
+            tree_output->Fill();
+            continue;
+        }
+
         if (N_valid_jets_tot < 4) {
             // tree_output->Fill();
             continue;
         }
 
-        // if (N_valid_b_jets == 0) {
-        //// tree_output->Fill();
-        // continue;
-        //}
-        // std::cout <<"I guess we are here now " << N_valid_jets <<std::endl;
+        if (N_valid_b_jets == 0) {
+            // tree_output->Fill();
+            continue;
+        }
+
+        if (channel == "data") {
+            weight = weight * .9;
+        }
+        // std::cout <<"I guess we are here now " << N_valid_jets
+        // <<std::endl;
         double dijet_mass_diff = 1e9;
         ROOT::Math::PxPyPzEVector W_hadronic_vector;
         if (N_valid_b_jets == 1) {
@@ -561,7 +631,9 @@ void CreateTuple::fillOutputTree(TString channel) {
         // top_hadronic_mass = top_hadronic_mass_2;
         // top_leptoninc_mass = top_leptoninc_mass_1;
         //}
-        int N_permu = 0;
+        // int N_permu = 0;
+        permutation_weight_sum = 0;
+        std::cout << "Entering the zoine" << std::endl;
         for (size_t a = 0; a < 4; ++a) {
             for (size_t b = a + 1; b < 4; ++b) {
 
@@ -578,8 +650,8 @@ void CreateTuple::fillOutputTree(TString channel) {
                         if (d == a || d == b || d == c)
                             continue;
 
-                        N_permu++;
-                        // This jet is b_lep.
+                        // N_permu++;
+                        //  This jet is b_lep.
                         chi2 = 0;
                         permutation_weight = 0;
                         std::array<int, 4> jet_perm = {
@@ -597,7 +669,7 @@ void CreateTuple::fillOutputTree(TString channel) {
                         // MET_px, MET_py, p, x_meas, sigma);
                         fillFitArrays(jet_perm, p, x_meas, sigma);
 
-                        FitResult fit = minimizeEvent(p, x_meas, sigma, nu_pz);
+                        FitResult fit = minimizeEvent(p, x_meas, sigma);
 
                         if (!fit.valid)
                             continue;
@@ -616,7 +688,8 @@ void CreateTuple::fillOutputTree(TString channel) {
                         double jet2_e_fit = solveJ2E(
                             fit.pfit[J1_E], fit.pfit[J1_ETA], fit.pfit[J1_PHI],
                             fit.pfit[J2_ETA], fit.pfit[J2_PHI]);
-
+                        if (jet2_e_fit < 0.0)
+                            continue;
                         auto j2_fit = jetFromEetaPhi(
                             jet2_e_fit, fit.pfit[J2_ETA], fit.pfit[J2_PHI], 0.);
 
@@ -640,7 +713,8 @@ void CreateTuple::fillOutputTree(TString channel) {
                         double jet4_e_fit = solveJ4EFromTopEquality(
                             W_lep_fit, top_had_fit.M(), fit.pfit[J4_ETA],
                             fit.pfit[J4_PHI], x_meas[X_J4_E], BOTTOM_MASS);
-
+                        if (jet4_e_fit < BOTTOM_MASS)
+                            continue;
                         auto j4_fit =
                             jetFromEetaPhi(jet4_e_fit, fit.pfit[J4_ETA],
                                            fit.pfit[J4_PHI], BOTTOM_MASS);
@@ -654,32 +728,207 @@ void CreateTuple::fillOutputTree(TString channel) {
                             Jet_Px[jet_perm[1]], Jet_Py[jet_perm[1]],
                             Jet_Pz[jet_perm[1]], Jet_E[jet_perm[1]]);
 
+                        //auto mu_reco = muonFromPxPyPz(mu1_Px, mu1_Py, mu1_Pz);
+                        //double nu_pz_reco = CalculateNeutrinoPz(
+                            //mu1_Px, mu1_Py, mu1_Pz, MET_px, MET_py);
+                        //auto nu_reco =
+                            //neutrinoFromMet(MET_px, MET_py, nu_pz_reco);
+
                         chi2 = chi2Diagonal(fit.pfit.data(), x_meas, sigma);
+                        if (std::abs(top_had_fit.M() - top_lep_fit.M()) > 1) {
+                            continue;
+                        }
                         if (chi2 > 10) {
                             // std::cout << "are we here?" << std::endl;
                             continue;
                         }
-                        permutation_weight = std::exp(-0.25 * chi2);
-                        auto W_had_reco = j1_reco + j2_reco;
-                        auto W_lep_reco = mu_fit + nu_fit;
+                        permutation_weight = std::exp(-0.5 * chi2);
+                        if (permutation_weight < 0.01)
+                            continue;
 
-                        W_hadronic_mass_reco = W_had_reco.M();
-                        W_leptonic_mass_reco = W_lep_reco.M();
-                        // fit.mW_had_fit = W_had_fit.M();
-                        // fit.mW_lep_fit = W_lep_fit.M();
+                        permutation_weight_sum =
+                            permutation_weight_sum + permutation_weight;
+                        // total_weight = weight * permutation_weight;
+                        //  auto W_had_reco = W_had_fit;
+                        // auto W_had_reco = j1_reco + j2_reco;
+                        // auto W_lep_reco = mu_reco + nu_reco;
 
-                        top_hadronic_mass = top_had_fit.M();
-                        top_leptoninc_mass = top_lep_fit.M();
-                        // fit.mt_fit = 0.5 * (fit.mt_had_fit + fit.mt_lep_fit);
+                        // ROOT::Math::PxPyPzEVector j3_reco(
+                        // Jet_Px[jet_perm[2]], Jet_Py[jet_perm[2]],
+                        // Jet_Pz[jet_perm[2]], Jet_E[jet_perm[2]]);
+                        // auto top_reco = W_had_reco + j3_reco;
 
-                        tree_output->Fill();
+                        // W_hadronic_mass_reco = W_had_reco.M();
+                        // W_leptonic_mass_reco = W_lep_reco.M();
+                        // top_hadronic_mass_reco = top_reco.M();
+                        //  fit.mW_had_fit = W_had_fit.M();
+                        //  std::cout
+                        //<< "target top mass = " << top_had_fit.M()
+                        //<< " | solved j4E = " << jet4_e_fit
+                        //<< " | top_lep mass = " << top_lep_fit.M()
+                        //<< " | diff = " << top_had_fit.M() -
+                        //  top_lep_fit.M()
+                        //<< std::endl; // fit.mW_lep_fit = W_lep_fit.M();
+
+                        // top_hadronic_mass = top_had_fit.M();
+                        // top_leptoninc_mass = top_lep_fit.M();
+                        //  fit.mt_fit = 0.5 * (fit.mt_had_fit +
+                        //  fit.mt_lep_fit);
+
+                        // tree_output->Fill();
                         // allFits.push_back(fit);
                     }
                 }
             }
         } // std::cout << "xi = " << chi2 << std::endl;
-        std::cout << "permus : " << N_permu << std::endl;
-        // tree_output->Fill();
+
+        for (size_t a = 0; a < 4; ++a) {
+            for (size_t b = a + 1; b < 4; ++b) {
+
+                // These two jets are the hadronic W jets.
+                // a < b avoids double-counting W jet order.
+
+                for (size_t c = 0; c < 4; ++c) {
+                    if (c == a || c == b)
+                        continue;
+
+                    // This jet is b_had.
+
+                    for (size_t d = 0; d < 4; ++d) {
+                        if (d == a || d == b || d == c)
+                            continue;
+
+                        // N_permu++;
+                        //  This jet is b_lep.
+                        chi2 = 0;
+                        permutation_weight = 0;
+                        std::array<int, 4> jet_perm = {
+                            valid_jets_tot_idx[a], // J1: W jet 1
+                            valid_jets_tot_idx[b], // J2: W jet 2
+                            valid_jets_tot_idx[c], // J3: b hadronic
+                            valid_jets_tot_idx[d]  // J4: b leptonic
+                        };
+
+                        std::array<double, N_PAR> p{};
+                        std::array<double, N_MEAS> x_meas{};
+                        std::array<double, N_MEAS> sigma{};
+
+                        // fillFitArrays(jet_perm, mu1_Px, mu1_Py, mu1_Pz,
+                        // MET_px, MET_py, p, x_meas, sigma);
+                        fillFitArrays(jet_perm, p, x_meas, sigma);
+
+                        FitResult fit = minimizeEvent(p, x_meas, sigma);
+
+                        if (!fit.valid)
+                            continue;
+
+                        // Use the minimized total function for ranking.
+                        // This includes detector chi2 + constraint penalty.
+
+                        // Rebuild fitted objects
+                        auto mu_fit = muonFromPxPyPz(
+                            fit.pfit[MU_PX], fit.pfit[MU_PY], fit.pfit[MU_PZ]);
+
+                        auto j1_fit =
+                            jetFromEetaPhi(fit.pfit[J1_E], fit.pfit[J1_ETA],
+                                           fit.pfit[J1_PHI], 0.);
+
+                        double jet2_e_fit = solveJ2E(
+                            fit.pfit[J1_E], fit.pfit[J1_ETA], fit.pfit[J1_PHI],
+                            fit.pfit[J2_ETA], fit.pfit[J2_PHI]);
+                        if (jet2_e_fit < 0.0)
+                            continue;
+                        auto j2_fit = jetFromEetaPhi(
+                            jet2_e_fit, fit.pfit[J2_ETA], fit.pfit[J2_PHI], 0.);
+
+                        auto j3_fit =
+                            jetFromEetaPhi(fit.pfit[J3_E], fit.pfit[J3_ETA],
+                                           fit.pfit[J3_PHI], BOTTOM_MASS);
+
+                        // auto j4_fit =
+                        // jetFromEetaPhi(fit.pfit[J4_E], fit.pfit[J4_ETA],
+                        // fit.pfit[J4_PHI], W_MASS);
+
+                        double nu_pz_fit = CalculateNeutrinoPz(
+                            fit.pfit[MU_PX], fit.pfit[MU_PY], fit.pfit[MU_PZ],
+                            fit.pfit[MET_X], fit.pfit[MET_Y]);
+                        auto nu_fit = neutrinoFromMet(
+                            fit.pfit[MET_X], fit.pfit[MET_Y], nu_pz_fit);
+
+                        auto W_lep_fit = mu_fit + nu_fit;
+                        auto W_had_fit = j1_fit + j2_fit;
+                        auto top_had_fit = W_had_fit + j3_fit;
+                        double jet4_e_fit = solveJ4EFromTopEquality(
+                            W_lep_fit, top_had_fit.M(), fit.pfit[J4_ETA],
+                            fit.pfit[J4_PHI], x_meas[X_J4_E], BOTTOM_MASS);
+                        if (jet4_e_fit < BOTTOM_MASS)
+                            continue;
+                        auto j4_fit =
+                            jetFromEetaPhi(jet4_e_fit, fit.pfit[J4_ETA],
+                                           fit.pfit[J4_PHI], BOTTOM_MASS);
+
+                        auto top_lep_fit = W_lep_fit + j4_fit;
+                        ROOT::Math::PxPyPzEVector j1_reco(
+                            Jet_Px[jet_perm[0]], Jet_Py[jet_perm[0]],
+                            Jet_Pz[jet_perm[0]], Jet_E[jet_perm[0]]);
+
+                        ROOT::Math::PxPyPzEVector j2_reco(
+                            Jet_Px[jet_perm[1]], Jet_Py[jet_perm[1]],
+                            Jet_Pz[jet_perm[1]], Jet_E[jet_perm[1]]);
+
+                        auto mu_reco = muonFromPxPyPz(mu1_Px, mu1_Py, mu1_Pz);
+                        double nu_pz_reco = CalculateNeutrinoPz(
+                            mu1_Px, mu1_Py, mu1_Pz, MET_px, MET_py);
+                        auto nu_reco =
+                            neutrinoFromMet(MET_px, MET_py, nu_pz_reco);
+
+                        chi2 = chi2Diagonal(fit.pfit.data(), x_meas, sigma);
+                        if (std::abs(top_had_fit.M() - top_lep_fit.M()) > 1) {
+                            continue;
+                        }
+                        if (chi2 > 10) {
+                            // std::cout << "are we here?" << std::endl;
+                            continue;
+                        }
+                        permutation_weight = std::exp(-0.5 * chi2);
+                        if (permutation_weight < 0.01)
+                            continue;
+
+                        total_weight = weight * permutation_weight;
+                        total_weight_norm =
+                            total_weight / permutation_weight_sum;
+                        // auto W_had_reco = W_had_fit;
+                        auto W_had_reco = j1_reco + j2_reco;
+                        auto W_lep_reco = mu_reco + nu_reco;
+
+                        ROOT::Math::PxPyPzEVector j3_reco(
+                            Jet_Px[jet_perm[2]], Jet_Py[jet_perm[2]],
+                            Jet_Pz[jet_perm[2]], Jet_E[jet_perm[2]]);
+                        auto top_reco = W_had_reco + j3_reco;
+
+                        W_hadronic_mass_reco = W_had_reco.M();
+                        W_leptonic_mass_reco = W_lep_reco.M();
+                        top_hadronic_mass_reco = top_reco.M();
+                        // fit.mW_had_fit = W_had_fit.M();
+                        // std::cout
+                        //<< "target top mass = " << top_had_fit.M()
+                        //<< " | solved j4E = " << jet4_e_fit
+                        //<< " | top_lep mass = " << top_lep_fit.M()
+                        //<< " | diff = " << top_had_fit.M() -
+                        // top_lep_fit.M()
+                        //<< std::endl; // fit.mW_lep_fit = W_lep_fit.M();
+
+                        top_hadronic_mass = top_had_fit.M();
+                        top_leptoninc_mass = top_lep_fit.M();
+                        // fit.mt_fit = 0.5 * (fit.mt_had_fit +
+                        // fit.mt_lep_fit);
+
+                        tree_output->Fill();
+                        //  allFits.push_back(fit);
+                    }
+                }
+            }
+        } // std::cout << "xi = " << chi2 << std::endl;
     }
 }
 
@@ -697,8 +946,8 @@ void CreateTuple::saveTree() {
 
 void CreateTuple::fillFitArrays(const std::array<int, 4> &jet_perm,
 
-                                // double mu1_Px, double mu1_Py, double mu1_Pz,
-                                // double MET_px, double MET_py,
+                                // double mu1_Px, double mu1_Py, double
+                                // mu1_Pz, double MET_px, double MET_py,
 
                                 std::array<double, N_PAR> &p,
                                 std::array<double, N_MEAS> &x_meas,
@@ -735,13 +984,15 @@ void CreateTuple::fillFitArrays(const std::array<int, 4> &jet_perm,
     for (size_t i = 0; i < 4; ++i) {
         int idx = jet_perm[i];
 
-        ROOT::Math::PxPyPzEVector jet_vector(Jet_Px[idx], Jet_Py[idx],
-                                             Jet_Pz[idx], Jet_E[idx]);
+        ROOT::Math::PxPyPzEVector jet_vector(
+            Jet_Px[idx] * JES, Jet_Py[idx] * JES, Jet_Pz[idx] * JES,
+            Jet_E[idx] * JES);
 
-        E[i] = Jet_E[idx];
+        E[i] = Jet_E[idx] * JES;
         eta[i] = jet_vector.Eta();
         phi[i] = jet_vector.Phi();
 
+        // std::cout << "JES: " << JES << std::endl;
         sigmaE[i] = jetSigmaE(E[i], eta[i]);
     }
 
@@ -768,7 +1019,7 @@ void CreateTuple::fillFitArrays(const std::array<int, 4> &jet_perm,
     p[J3_PHI] = phi[2];
 
     // J4: b leptonic
-    //p[J4_E] = E[3];
+    // p[J4_E] = E[3];
     p[J4_ETA] = eta[3];
     p[J4_PHI] = phi[3];
 

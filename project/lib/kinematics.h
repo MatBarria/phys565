@@ -100,8 +100,7 @@ double CalculateNeutrinoPz(double mu_px, double mu_py, double mu_pz,
 
 FitResult minimizeEvent(const std::array<double, N_PAR> &p_start,
                         const std::array<double, N_MEAS> &x_meas,
-                        const std::array<double, N_MEAS> &sigma,
-                        const float nu_pz);
+                        const std::array<double, N_MEAS> &sigma);
 
 double deltaPhi(double phi1, double phi2);
 bool isPhiIndex(int i);
