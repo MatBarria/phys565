@@ -136,11 +136,11 @@ void fitMass() {
     // RooFFTConvPdf model("model", "Landau #otimes Gaussian", m_fit, landau,
     // gauss);
 
-    TFile *file =
-        TFile::Open("../data/proccess_tuples/ttbar_tuples_JES1p00.root");
-
     // TFile *file =
-    // TFile::Open("../data/proccess_tuples/data_tuples_JES1p00.root");
+    // TFile::Open("../data/proccess_tuples/ttbar_tuples_JES1p00.root");
+
+    TFile *file =
+        TFile::Open("../data/proccess_tuples/data_tuples_JES1p00.root");
 
     // TFile *file = TFile::Open("../data/proccess_tuples/data_tuples.root");
     //  TFile *file =

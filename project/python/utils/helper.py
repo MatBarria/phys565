@@ -86,51 +86,79 @@ def get_histograms(variable, sources, era):
     return histograms
 
 
-def get_histograms_ratio(numerator_histogram, denominator_histogram):
-    """
-    Calculates the ratio of two histograms with error propagation.
+# def get_histograms_ratio(numerator_histogram, denominator_histogram):
+    # """
+    # Calculates the ratio of two histograms with error propagation.
 
-    Parameters:
-    ----------
-    numerator_histogram : numpy.ndarray
-        The histogram values for the numerator.
-    denominator_histogram : numpy.ndarray
-        The histogram values for the denominator.
+    # Parameters:
+    # ----------
+    # numerator_histogram : numpy.ndarray
+        # The histogram values for the numerator.
+    # denominator_histogram : numpy.ndarray
+        # The histogram values for the denominator.
 
-    Returns:
-    -------
-    ratio : numpy.ndarray
-        Numpy array with the ratio of the two histograms.
-    error : numpy.ndarray
-        Numpy array with the erros of ratio of the two histograms.
+    # Returns:
+    # -------
+    # ratio : numpy.ndarray
+        # Numpy array with the ratio of the two histograms.
+    # error : numpy.ndarray
+        # Numpy array with the erros of ratio of the two histograms.
 
-    Notes:
-    ------
-    If any elements in the denominator are zero, they are excluded from the calculation.
-    """
+    # Notes:
+    # ------
+    # If any elements in the denominator are zero, they are excluded from the calculation.
+    # """
+    # ratio = np.divide(
+        # numerator_histogram, denominator_histogram, where=(denominator_histogram != 0)
+    # )
+    # error = np.divide(
+        # numerator_histogram * np.sqrt(denominator_histogram)
+        # + denominator_histogram * np.sqrt(numerator_histogram),
+        # np.power(denominator_histogram, 2),
+        # where=(denominator_histogram != 0),
+    # )
+    # if len(error[error < 0.0]):
+        # msg = (
+            # "Unexpected negative ratio-error values found."
+            # "Setting them to zero.\n > Re-run. If the value changes, "
+            # "it might have to do with the minimum subnormal number bug!"
+        # )
+        # print(msg)
+        # print("Error; length")
+        # print(error[error < 0.0], len(error[error < 0.0]))
+        # print("Ratio values")
+        # print(ratio[np.where(error < 0.0)])
+        # error[error < 0.0] = 0.0
+
+    # return ratio, error
+
+def get_histograms_ratio(data_hist, mc_hist, data_err=None, mc_err=None):
+    data_hist = np.asarray(data_hist, dtype=float)
+    mc_hist = np.asarray(mc_hist, dtype=float)
+
+    if data_err is None:
+        data_err = np.sqrt(data_hist)
+
+    if mc_err is None:
+        mc_err = np.zeros_like(mc_hist)
+
     ratio = np.divide(
-        numerator_histogram, denominator_histogram, where=(denominator_histogram != 0)
+        data_hist,
+        mc_hist,
+        out=np.zeros_like(data_hist, dtype=float),
+        where=mc_hist > 0,
     )
-    error = np.divide(
-        numerator_histogram * np.sqrt(denominator_histogram)
-        + denominator_histogram * np.sqrt(numerator_histogram),
-        np.power(denominator_histogram, 2),
-        where=(denominator_histogram != 0),
-    )
-    if len(error[error < 0.0]):
-        msg = (
-            "Unexpected negative ratio-error values found."
-            "Setting them to zero.\n > Re-run. If the value changes, "
-            "it might have to do with the minimum subnormal number bug!"
-        )
-        print(msg)
-        print("Error; length")
-        print(error[error < 0.0], len(error[error < 0.0]))
-        print("Ratio values")
-        print(ratio[np.where(error < 0.0)])
-        error[error < 0.0] = 0.0
 
-    return ratio, error
+    ratio_err = np.zeros_like(ratio)
+
+    valid = (data_hist > 0) & (mc_hist > 0)
+
+    ratio_err[valid] = ratio[valid] * np.sqrt(
+        (data_err[valid] / data_hist[valid]) ** 2
+        + (mc_err[valid] / mc_hist[valid]) ** 2
+    )
+
+    return ratio, ratio_err
 
 
 def get_output_directory(variable, base_directory, variables_dic):

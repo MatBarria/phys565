@@ -16,6 +16,7 @@ def compute_cross_section(
     dn_bkg_stat=0.0,
     dlumi=0.0,
     dn_bkg_syst=0.0,
+    cross_section_btag_syst_error=0.0,
 ):
 
     if dn_obs_stat is None:
@@ -54,11 +55,11 @@ def compute_cross_section(
 
     cross_section_syst_error = math.sqrt(
         cross_section_bkg_syst_error**2
+        + cross_section_btag_syst_error**2
         + cross_section_trigger_error**2
         + cross_section_acceptance_error**2
         + cross_section_lumi_error**2
     )
-
     cross_section_total_error = math.sqrt(
         cross_section_stat_error**2 + cross_section_syst_error**2
     )
@@ -78,6 +79,7 @@ def compute_cross_section(
         "cross_section_stat_error": cross_section_stat_error,
         "dn_bkg_syst": dn_bkg_syst,
         "cross_section_bkg_syst_error": cross_section_bkg_syst_error,
+        "cross_section_btag_syst_error": cross_section_btag_syst_error,
         "dlumi": dlumi,
         "cross_section_trigger_error": cross_section_trigger_error,
         "cross_section_acceptance_error": cross_section_acceptance_error,
@@ -86,6 +88,42 @@ def compute_cross_section(
         "cross_section_total_error": cross_section_total_error,
     }
 
+
+
+def print_latex_uncertainty_table(results):
+    sigma = results["cross_section_pb"]
+
+    rows = [
+        ("Statistical", results["cross_section_stat_error"]),
+        ("Background normalization", results["cross_section_bkg_syst_error"]),
+        ("b-tagging", results["cross_section_btag_syst_error"]),
+        ("Trigger efficiency", results["cross_section_trigger_error"]),
+        ("Acceptance", results["cross_section_acceptance_error"]),
+        ("Luminosity", results["cross_section_lumi_error"]),
+        ("Total systematic", results["cross_section_syst_error"]),
+        ("Total", results["cross_section_total_error"]),
+    ]
+
+    print("\n==========================================")
+    print("LaTeX uncertainty table")
+    print("==========================================")
+    print(r"\begin{table}[htbp]")
+    print(r"\centering")
+    print(r"\begin{tabular}{lcc}")
+    print(r"\hline")
+    print(r"Source & Uncertainty [pb] & Relative uncertainty [\%] \\")
+    print(r"\hline")
+
+    for name, err in rows:
+        rel = 100.0 * err / sigma if sigma != 0 else 0.0
+        print(f"{name} & {err:.2f} & {rel:.1f} \\\\")
+
+    print(r"\hline")
+    print(r"\end{tabular}")
+    print(r"\caption{Uncertainty contributions to the measured $t\bar{t}$ production cross section.}")
+    print(r"\label{tab:cross_section_uncertainties}")
+    print(r"\end{table}")
+    print("==========================================")
 
 if __name__ == "__main__":
 
@@ -99,6 +137,7 @@ if __name__ == "__main__":
         "mu1_Pt",
     ]
     tuple_path = "../data/proccess_tuples/no_cuts/"
+    # tuple_path = "../data/proccess_tuples/no_cuts_btagsys/"
     # tuple_path = "../data/proccess_tuples/"
     background_tree = ur.open(tuple_path + "background.root:tree_output")
     background_branches = background_tree.arrays(variables, library="np")  # type: ignore
@@ -112,24 +151,24 @@ if __name__ == "__main__":
     bool_list_bkg = np.ones_like(background_branches[variables[0]], dtype=bool)
     bool_list_bkg = (bool_list_bkg) & (background_branches["triggerIsoMu24"] == 1)
     bool_list_bkg = (bool_list_bkg) & (background_branches["NMuon_valid"] > 0)
-    # bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_jets_tot"] >= 4)
+    bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_jets_tot"] >= 4)
     bool_list_bkg = (bool_list_bkg) & (background_branches["N_valid_b_jets"] >= 1)
-    # bool_list_bkg = (bool_list_bkg) & (background_branches["MET_pt"] >= 16)
+    bool_list_bkg = (bool_list_bkg) & (background_branches["MET_pt"] >= 7)
 
     bool_list_sig = np.ones_like(signal_branches[variables[0]], dtype=bool)
     bool_list_sig = (bool_list_sig) & (signal_branches["NMuon_valid"] > 0)
     bool_list_sig_trigger = (bool_list_sig) & (signal_branches["triggerIsoMu24"] == 1)
     bool_list_sig_Muon = bool_list_sig
-    # bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_jets_tot"] >= 4)
+    bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_jets_tot"] >= 4)
     bool_list_sig = (bool_list_sig) & (signal_branches["N_valid_b_jets"] >= 1)
-    # bool_list_sig = (bool_list_sig) & (signal_branches["MET_pt"] >= 16)
+    bool_list_sig = (bool_list_sig) & (signal_branches["MET_pt"] >= 7)
 
     bool_list_data = np.ones_like(data_branches[variables[0]], dtype=bool)
     bool_list_data = (bool_list_data) & (data_branches["triggerIsoMu24"] == 1)
     bool_list_data = (bool_list_data) & (data_branches["NMuon_valid"] > 0)
-    # bool_list_data = (bool_list_data) & (data_branches["N_valid_jets_tot"] >= 4)
+    bool_list_data = (bool_list_data) & (data_branches["N_valid_jets_tot"] >= 4)
     bool_list_data = (bool_list_data) & (data_branches["N_valid_b_jets"] >= 1)
-    # bool_list_data = (bool_list_data) & (data_branches["MET_pt"] >= 16)
+    bool_list_data = (bool_list_data) & (data_branches["MET_pt"] >= 7)
 
     background_branches["weight"] = background_branches["weight"] * 0.9
     # signal_branches["weight"] = signal_branches["weight"] * 0.9
@@ -145,10 +184,10 @@ if __name__ == "__main__":
     # n_bkg = 0
     # n_obs = 133.048
 
-    dn_obs_stat = 17.6393
-    n_bkg = 0
-    n_obs = 506.941
-    dn_bkg_stat = 0
+    # dn_obs_stat = 17.6393 * ((59.0248 + 98.7158 + 37.486 + 34.20564) / 506.941)
+    # n_bkg = 0
+    # n_obs = (59.0248 + 98.7158 + 37.486 + 34.20564)
+    # dn_bkg_stat = 0
 
     n_trigger_total = np.sum(signal_branches["weight"][bool_list_sig_Muon])
     n_trigger = np.sum(signal_branches["weight"][bool_list_sig_trigger])
@@ -167,9 +206,9 @@ if __name__ == "__main__":
     print(trigger_efficiency)
     print(acceptance_efficiency)
 
-    # dn_bkg_syst = 3.5
-    dlumi = 50 * 0.025
-
+    dn_bkg_syst = 0.20 * n_bkg
+    dlumi = 50 * 0.03
+    cross_section_btag_syst_error = 160.614012 - 158.977347
     results = compute_cross_section(
         n_obs=n_obs,
         n_bkg=n_bkg,
@@ -181,7 +220,8 @@ if __name__ == "__main__":
         # dn_obs_stat=dn_obs_stat,  # uses sqrt(n_obs)
         dn_bkg_stat=dn_bkg_stat,
         dlumi=dlumi,
-        # dn_bkg_syst=dn_bkg_syst,
+        dn_bkg_syst=dn_bkg_syst,
+        cross_section_btag_syst_error=cross_section_btag_syst_error,
     )
 
     print("==========================================")
@@ -223,4 +263,10 @@ if __name__ == "__main__":
     print(
         f"luminosity contribution       = {results['cross_section_lumi_error']:.6f} pb"
     )
+    print(
+        f"b-tag syst contribution       = {results['cross_section_btag_syst_error']:.6f} pb"
+    )
     print("==========================================")
+
+
+    print_latex_uncertainty_table(results)

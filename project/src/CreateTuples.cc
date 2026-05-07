@@ -467,7 +467,8 @@ void CreateTuple::fillOutputTree(TString channel) {
             }
         }
         N_valid_jets = N_valid_b_jets = 0;
-        const float BTAG_CUT = 1.;
+        const float BTAG_CUT = 1.511;
+        // const float BTAG_CUT = 1.7625899280575539;
         std::vector<int> valid_jets_idx;
         std::vector<int> valid_b_jets_idx;
         std::vector<int> valid_jets_tot_idx;
@@ -528,12 +529,12 @@ void CreateTuple::fillOutputTree(TString channel) {
         W_leptonic_mass = W_hadronic_mass = top_hadronic_mass_1 =
             top_hadronic_mass_2 = top_leptoninc_mass_1 = top_leptoninc_mass_2 =
                 -1;
-        if (N_valid_b_jets >= 2) {
-            N_valid_b_jets = 2;
-        }
-        if (N_valid_jets_tot >= 5) {
-            N_valid_jets_tot = 5;
-        }
+        // if (N_valid_b_jets >= 2) {
+        // N_valid_b_jets = 2;
+        //}
+        // if (N_valid_jets_tot >= 5) {
+        // N_valid_jets_tot = 5;
+        //}
 
         chi2 = 0;
         permutation_weight = 0;
@@ -550,6 +551,9 @@ void CreateTuple::fillOutputTree(TString channel) {
 
         if (N_valid_b_jets == 0) {
             // tree_output->Fill();
+            continue;
+        }
+        if (MET_pt < 7) {
             continue;
         }
 
@@ -640,6 +644,17 @@ void CreateTuple::fillOutputTree(TString channel) {
                 // These two jets are the hadronic W jets.
                 // a < b avoids double-counting W jet order.
 
+                if (valid_jets_tot_idx[a] == valid_b_jets_idx[0] ||
+                    valid_jets_tot_idx[b] == valid_b_jets_idx[0]) {
+                    continue;
+                }
+                if (N_valid_b_jets > 1) {
+                    if (valid_jets_tot_idx[a] == valid_b_jets_idx[1] ||
+                        valid_jets_tot_idx[b] == valid_b_jets_idx[1]) {
+                        continue;
+                    }
+                }
+
                 for (size_t c = 0; c < 4; ++c) {
                     if (c == a || c == b)
                         continue;
@@ -728,17 +743,17 @@ void CreateTuple::fillOutputTree(TString channel) {
                             Jet_Px[jet_perm[1]], Jet_Py[jet_perm[1]],
                             Jet_Pz[jet_perm[1]], Jet_E[jet_perm[1]]);
 
-                        //auto mu_reco = muonFromPxPyPz(mu1_Px, mu1_Py, mu1_Pz);
-                        //double nu_pz_reco = CalculateNeutrinoPz(
-                            //mu1_Px, mu1_Py, mu1_Pz, MET_px, MET_py);
-                        //auto nu_reco =
-                            //neutrinoFromMet(MET_px, MET_py, nu_pz_reco);
+                        // auto mu_reco = muonFromPxPyPz(mu1_Px, mu1_Py,
+                        // mu1_Pz); double nu_pz_reco = CalculateNeutrinoPz(
+                        // mu1_Px, mu1_Py, mu1_Pz, MET_px, MET_py);
+                        // auto nu_reco =
+                        // neutrinoFromMet(MET_px, MET_py, nu_pz_reco);
 
                         chi2 = chi2Diagonal(fit.pfit.data(), x_meas, sigma);
                         if (std::abs(top_had_fit.M() - top_lep_fit.M()) > 1) {
                             continue;
                         }
-                        if (chi2 > 10) {
+                        if (chi2 > 15) {
                             // std::cout << "are we here?" << std::endl;
                             continue;
                         }
@@ -787,6 +802,16 @@ void CreateTuple::fillOutputTree(TString channel) {
 
                 // These two jets are the hadronic W jets.
                 // a < b avoids double-counting W jet order.
+                if (valid_jets_tot_idx[a] == valid_b_jets_idx[0] ||
+                    valid_jets_tot_idx[b] == valid_b_jets_idx[0]) {
+                    continue;
+                }
+                if (N_valid_b_jets > 1) {
+                    if (valid_jets_tot_idx[a] == valid_b_jets_idx[1] ||
+                        valid_jets_tot_idx[b] == valid_b_jets_idx[1]) {
+                        continue;
+                    }
+                }
 
                 for (size_t c = 0; c < 4; ++c) {
                     if (c == a || c == b)
@@ -904,6 +929,7 @@ void CreateTuple::fillOutputTree(TString channel) {
                         ROOT::Math::PxPyPzEVector j3_reco(
                             Jet_Px[jet_perm[2]], Jet_Py[jet_perm[2]],
                             Jet_Pz[jet_perm[2]], Jet_E[jet_perm[2]]);
+
                         auto top_reco = W_had_reco + j3_reco;
 
                         W_hadronic_mass_reco = W_had_reco.M();

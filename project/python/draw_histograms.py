@@ -42,6 +42,7 @@ def get_histograms_from_tuple(
 
     histograms_list = []
     bins_list = []
+    errors_list = []
 
     # variable_bin = variables[0]
 
@@ -72,8 +73,8 @@ def get_histograms_from_tuple(
         if variables[0] != "NMuon_valid":
             bool_list = (bool_list) & (branches["NMuon_valid"] > 0)
         bool_list = (bool_list) & (branches["N_valid_b_jets"] >= 1)
-        if variables[0] != "N_valid_jets_tot" and variables[0] != "N_valid_b_jets":
-            bool_list = (bool_list) & (branches["N_valid_jets_tot"] >= 4)
+        # if variables[0] != "N_valid_jets_tot" and variables[0] != "N_valid_b_jets":
+        bool_list = (bool_list) & (branches["N_valid_jets_tot"] >= 4)
 
         for var in variables:
             # if var in ["top_hadronic_mass_1", "top_hadronic_mass_2"]:
@@ -88,16 +89,27 @@ def get_histograms_from_tuple(
             range=X_RANGE[variables[0]],
             weights=(branches[weight_var]),
         )
+
+        hist_variance, _ = np.histogram(
+            branches[variables[0]],
+            bins=N_BINS[variables[0]],
+            range=X_RANGE[variables[0]],
+            weights=(branches[weight_var] ** 2),
+        )
+
         # if np.sum(histogram) ==0:
         # sources.remove(source)
         # continue;
         histogram[histogram == 0] = 0.00000001
+        hist_variance[hist_variance == 0] = 0.00000001
+        hist_error = np.sqrt(hist_variance)
         histograms_list.append(histogram)
+        errors_list.append(hist_error)
         bins_list.append(bins)
         # print("variable: ", variables[0])
         # print("source : ", source)
         # print("histo : ", histogram)
-    return histograms_list, bins_list
+    return histograms_list, errors_list, bins_list
 
 
 def draw_data_and_simul_and_ratio(
@@ -135,25 +147,29 @@ def draw_data_and_simul_and_ratio(
 
     # print(variables)
 
-    data_histogram, data_bins = get_histograms_from_tuple(
+    data_histogram, _, data_bins = get_histograms_from_tuple(
         ["data"],
         variables,
         use_dimuon_mass_cut,
         use_permutation_weight,
     )
 
-    bkg_histograms_list, bkg_bins_list = get_histograms_from_tuple(
-        background_sources,
-        variables,
-        use_dimuon_mass_cut,
-        use_permutation_weight,
+    bkg_histograms_list, bkg_histogram_error_list, bkg_bins_list = (
+        get_histograms_from_tuple(
+            background_sources,
+            variables,
+            use_dimuon_mass_cut,
+            use_permutation_weight,
+        )
     )
 
-    signal_histograms_list, signal_bins_list = get_histograms_from_tuple(
-        signal_sources,
-        variables,
-        use_dimuon_mass_cut,
-        use_permutation_weight,
+    signal_histograms_list, signal_histogram_error_list, signal_bins_list = (
+        get_histograms_from_tuple(
+            signal_sources,
+            variables,
+            use_dimuon_mass_cut,
+            use_permutation_weight,
+        )
     )
 
     fig, axs = get_canvas(True)
@@ -179,6 +195,25 @@ def draw_data_and_simul_and_ratio(
         ax=axs[0],
     )
 
+    # Total MC statistical uncertainty band
+    total_mc = np.sum(np.array(bkg_histograms_list), axis=0)
+    total_mc_var = np.sum(np.array(bkg_histogram_error_list) ** 2, axis=0)
+    total_mc_err = np.sqrt(total_mc_var)
+
+    # If you want to include signal in the MC uncertainty band:
+
+    bin_edges = bkg_bins_list[0]
+
+    axs[0].stairs(
+        total_mc + total_mc_err,
+        bin_edges,
+        baseline=total_mc - total_mc_err,
+        fill=True,
+        hatch="////",
+        alpha=0.3,
+        label="MC bkg stat. unc.",
+    )
+
     signal_scale_factor = 1
     for source, histogram in zip(signal_sources, signal_histograms_list):
         hep.histplot(
@@ -192,22 +227,50 @@ def draw_data_and_simul_and_ratio(
             ax=axs[0],
         )
 
-    label = ""
-    hep.cms.label(
-        data="True",
-        label=label,
-        # year=2011,
-        com="7",
-        lumi="50",
-        ax=axs[0],
+    total_mc_sig = np.sum(np.array(signal_histograms_list), axis=0)
+    total_mc_var_sig = np.sum(np.array(signal_histogram_error_list) ** 2, axis=0)
+    total_mc_err_sig = np.sqrt(total_mc_var)
+
+    total_mc_with_signal = total_mc + total_mc_sig
+    total_mc_with_signal_err = np.sqrt(total_mc_err**2 + signal_histogram_error_list[0] ** 2)
+
+    lower = total_mc_sig - total_mc_err_sig
+    upper = total_mc_sig + total_mc_err_sig
+
+    axs[0].fill_between(
+        signal_bins_list[0],
+        np.r_[lower, lower[-1]],
+        np.r_[upper, upper[-1]],
+        step="post",
+        alpha=0.25,
+        label="MC signal stat. unc.",
+        color="red",
     )
 
-    if not use_permutation_weight and variable in [
-        "N_valid_jets_tot",
-        "N_valid_b_jets",
-    ]:
+    label = ""
+    hep.cms.label(
+        data=True,
+        label="",
+        com="7.0",
+        lumi=None,  # suppress automatic lumi
+        ax=axs[0],
+    )
+    # Add lumi manually at the standard top-right position
+    axs[0].annotate(
+        r"50 pb$^{-1}$               ",
+        xy=(1, 1),
+        xycoords="axes fraction",
+        ha="right",
+        va="bottom",
+        fontsize=27,
+    )
 
-        draw_fitted_xs(axs[0], variable, 506.941, 32.12, 1888.65, 49.1959)
+    # if not use_permutation_weight and variable in [
+    # "N_valid_jets_tot",
+    # "N_valid_b_jets",
+    # ]:
+
+    # draw_fitted_xs(axs[0], variable, 506.941, 32.12, 1888.65, 49.1959)
 
     if variable == "top_hadronic_mass_2":
         crystal_ball_params = [
@@ -262,7 +325,9 @@ def draw_data_and_simul_and_ratio(
 
     tot_bg_numpy_hist = tot_bg_numpy_hist + signal_histograms_list[0]
 
-    ratio_hist, ratio_error = get_histograms_ratio(data_histogram[0], tot_bg_numpy_hist)
+    ratio_hist, ratio_error = get_histograms_ratio(
+        data_histogram[0], tot_bg_numpy_hist, mc_err=total_mc_with_signal_err
+    )
 
     hep.histplot(
         ratio_hist,
@@ -275,9 +340,21 @@ def draw_data_and_simul_and_ratio(
     )
 
     axs[1].set_ylabel("Data/MC", loc="center")
-    axs[1].set_ylim(0.5, 1.5)
+    axs[1].set_ylim(0.3, 2.5)
     axs[1].set_xlim(data_bins[0][0], data_bins[0][-1])
     axs[1].set_xlabel(get_x_label(variable))
+
+    # mass_reco = 172.46875
+    # if "W" in variable:
+    # mass_reco = 80
+    # axs[0].axvline(
+    # x=mass_reco,
+    # # ymin=0.0,
+    # # ymax=max_height,
+    # color="red",
+    # linestyle="--",
+    # alpha=0.5,
+    # )
 
     output_directory = "../plots/ratio-proccessed/"
 
@@ -313,51 +390,51 @@ draw_data_and_simul_and_ratio(
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     use_permutation_weight=True,
-    y_label=r"Sum of permutations weights/ 5 Gev",
+    y_label=r"Sum of permutations weights/ 15 GeV",
 )
-draw_data_and_simul_and_ratio(
-    "top_hadronic_mass",
-    BACKGROUND_SOURCES,
-    SIGNAL_SOURCES,
-    # use_permutation_weight=True,
-    y_label=r"Permutations / 5 Gev",
-)
+# draw_data_and_simul_and_ratio(
+# "top_hadronic_mass",
+# BACKGROUND_SOURCES,
+# SIGNAL_SOURCES,
+# # use_permutation_weight=True,
+# y_label=r"Permutations / 5 GeV",
+# )
 draw_data_and_simul_and_ratio(
     "top_hadronic_mass_reco",
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     # use_permutation_weight=True,
-    y_label=r"Permutations / 5 Gev",
+    y_label=r"Permutations / 15 GeV",
 )
 draw_data_and_simul_and_ratio(
     "W_hadronic_mass_reco",
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     # use_permutation_weight=true,
-    y_label=r"permutations / 5 gev",
+    y_label=r"Permutations / 10 gev",
 )
 draw_data_and_simul_and_ratio(
     "W_hadronic_mass_reco",
     BACKGROUND_SOURCES,
     SIGNAL_SOURCES,
     use_permutation_weight=True,
-    y_label=r"sum of permutations weights/ 5 gev",
+    y_label=r"Sum of permutations weights/ 10 gev",
 )
-draw_data_and_simul_and_ratio(
-    "W_leptonic_mass_reco",
-    BACKGROUND_SOURCES,
-    SIGNAL_SOURCES,
-    use_permutation_weight=True,
-)
-draw_data_and_simul_and_ratio(
-    "NMuon_valid",
-    BACKGROUND_SOURCES,
-    SIGNAL_SOURCES,
-    use_permutation_weight=True,
-)
-draw_data_and_simul_and_ratio(
-    "chi2",
-    BACKGROUND_SOURCES,
-    SIGNAL_SOURCES,
-    use_permutation_weight=False,
-)
+# draw_data_and_simul_and_ratio(
+# "W_leptonic_mass_reco",
+# BACKGROUND_SOURCES,
+# SIGNAL_SOURCES,
+# use_permutation_weight=True,
+# )
+# draw_data_and_simul_and_ratio(
+# "NMuon_valid",
+# BACKGROUND_SOURCES,
+# SIGNAL_SOURCES,
+# use_permutation_weight=True,
+# )
+# draw_data_and_simul_and_ratio(
+# "chi2",
+# BACKGROUND_SOURCES,
+# SIGNAL_SOURCES,
+# use_permutation_weight=False,
+# )

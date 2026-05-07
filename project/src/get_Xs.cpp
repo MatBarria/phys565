@@ -176,20 +176,55 @@ void get_Xs() {
     // ---------------------------------------------------------
     // 6. Build extended model
     // ---------------------------------------------------------
+
+    // ---------------------------------------------------------
+    // 6. Build extended model with a background systematic
+    // ---------------------------------------------------------
+
     RooRealVar n_sig("n_sig", "Fitted signal yield", 0.5 * nData, 0.0,
                      2.0 * nData);
 
-    RooRealVar n_bkg("n_bkg", "Fitted background yield", 0.5 * nData, 0.0,
-                     2.0 * nData);
+    // Nominal background yield parameter
+    RooRealVar n_bkg_nom("n_bkg_nom", "Nominal background yield", 0.5 * nData,
+                         0.0, 2.0 * nData);
 
+    // Nuisance parameter: 0 = nominal, +1 = +1 sigma, -1 = -1 sigma
+    RooRealVar theta_bkg("theta_bkg", "Background normalization nuisance", 0.0,
+                         -5.0, 5.0);
+
+    // Relative background systematic uncertainty
+    double rel_bkg_syst = 0.30; // 30%
+
+    // Effective background yield:
+    // n_bkg = n_bkg_nom * (1 + rel_bkg_syst * theta_bkg)
+    RooFormulaVar n_bkg("n_bkg", "Background yield with systematic",
+                        "@0 * (1.0 + 0.30 * @1)",
+                        RooArgList(n_bkg_nom, theta_bkg));
+
+    // Gaussian constraint on theta_bkg: theta_bkg = 0 +/- 1
+    RooRealVar theta_bkg_mean("theta_bkg_mean", "theta_bkg_mean", 0.0);
+    RooRealVar theta_bkg_sigma("theta_bkg_sigma", "theta_bkg_sigma", 1.0);
+
+    RooGaussian constraint_bkg(
+        "constraint_bkg", "Gaussian constraint for background normalization",
+        theta_bkg, theta_bkg_mean, theta_bkg_sigma);
+
+    // Signal + background model
     RooAddPdf model("model", "Signal + Background",
                     RooArgList(pdf_sig, pdf_bkg), RooArgList(n_sig, n_bkg));
 
     // ---------------------------------------------------------
+    // 7. Fit with external Gaussian constraint
+    // ---------------------------------------------------------
+    RooFitResult *fitResult = model.fitTo(
+        data, Extended(true), ExternalConstraints(RooArgSet(constraint_bkg)),
+        Save(true), PrintLevel(-1));
+
+    // ---------------------------------------------------------
     // 7. Fit
     // ---------------------------------------------------------
-    RooFitResult *fitResult =
-        model.fitTo(data, Extended(true), Save(true), PrintLevel(-1));
+    // RooFitResult *fitResult =
+    // model.fitTo(data, Extended(true), Save(true), PrintLevel(-1));
 
     if (fitResult) {
         fitResult->Print("v");
@@ -207,14 +242,25 @@ void get_Xs() {
     std::cout << "Data events          : " << nData << std::endl;
     std::cout << "Fitted signal n_sig  : " << n_sig.getVal() << " +/- "
               << n_sig.getError() << std::endl;
-    std::cout << "Fitted bkg n_bkg     : " << n_bkg.getVal() << " +/- "
-              << n_bkg.getError() << std::endl;
+    // std::cout << "Fitted bkg n_bkg     : " << n_bkg.getVal() << " +/- "
+    //<< n_bkg.getError() << std::endl;
 
     double purity = n_sig.getVal() / (n_sig.getVal() + n_bkg.getVal());
 
     std::cout << "Fitted purity        : " << purity << std::endl;
     std::cout << "========================================================"
               << std::endl;
+
+    std::cout << "Fitted signal n_sig  : " << n_sig.getVal() << " +/- "
+              << n_sig.getError() << std::endl;
+
+    std::cout << "Fitted bkg n_bkg     : " << n_bkg.getVal() << std::endl;
+
+    std::cout << "Nominal bkg param    : " << n_bkg_nom.getVal() << " +/- "
+              << n_bkg_nom.getError() << std::endl;
+
+    std::cout << "Bkg nuisance theta   : " << theta_bkg.getVal() << " +/- "
+              << theta_bkg.getError() << std::endl;
 
     double chi2 = 0.0;
     int nBinsUsed = 0;
