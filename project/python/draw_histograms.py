@@ -147,7 +147,7 @@ def draw_data_and_simul_and_ratio(
 
     # print(variables)
 
-    data_histogram, _, data_bins = get_histograms_from_tuple(
+    data_histogram, data_histogram_error, data_bins = get_histograms_from_tuple(
         ["data"],
         variables,
         use_dimuon_mass_cut,
@@ -188,7 +188,7 @@ def draw_data_and_simul_and_ratio(
     hep.histplot(
         data_histogram[0],
         data_bins[0],
-        yerr=True,
+        yerr=data_histogram_error[0],
         histtype="errorbar",
         label="Data",
         color="black",

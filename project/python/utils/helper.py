@@ -395,10 +395,11 @@ def draw_fit(
         y_counts,
         linewidth=2,
         label=(
-            rf"{label}: "
+            rf"{label}"
             # rf"$m={mean:.2f}\pm{mean_err:.2f}$ GeV, "
             # rf"$\sigma={sigma:.2f}\pm{sigma_err:.2f}$ GeV"
         ),
+        color="red"
     )
 
     return x, y_counts
