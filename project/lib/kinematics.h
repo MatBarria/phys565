@@ -66,28 +66,10 @@ enum FitParIndex {
     J3_ETA = 9,
     J3_PHI = 10,
 
-    //J4_E = 11,
-    J4_ETA = 11,
     J4_PHI = 12,
 
     MET_X = 13,
     MET_Y = 14,
-    // J2_E = 6,
-    // J2_ETA = 7,
-    // J2_PHI = 8,
-
-    // J3_E = 9,
-    // J3_ETA = 10,
-    // J3_PHI = 11,
-
-    // J4_E = 12,
-    // J4_ETA = 13,
-    // J4_PHI = 14,
-
-    // MET_X = 15,
-    // MET_Y = 16,
-
-    // NU_PZ = 17
 };
 
 ROOT::Math::PxPyPzEVector muonFromPxPyPz(double px, double py, double pz);

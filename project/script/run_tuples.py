@@ -8,7 +8,7 @@ output_directory = "/home/truga/projects/phys565/project/data/proccess_tuples/"
 os.makedirs(output_directory, exist_ok=True)
 
 datasets = ["dy", "qcd", "wjets", "single_top", "ww", "wz", "zz", "ttbar", "data"]
-# JESs = ["0.97", "1", "1.03"]
+# JESs = ["1", "1.03"]
 JESs = ["1.0"]
 
 

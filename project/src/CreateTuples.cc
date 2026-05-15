@@ -468,7 +468,7 @@ void CreateTuple::fillOutputTree(TString channel) {
         }
         N_valid_jets = N_valid_b_jets = 0;
         const float BTAG_CUT = 1.511;
-        // const float BTAG_CUT = 1.7625899280575539;
+        //const float BTAG_CUT = 1.7625899280575539;
         std::vector<int> valid_jets_idx;
         std::vector<int> valid_b_jets_idx;
         std::vector<int> valid_jets_tot_idx;
